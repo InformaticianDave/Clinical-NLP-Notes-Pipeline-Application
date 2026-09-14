@@ -1,0 +1,92 @@
+# =============================================================================
+# PHI AND PATIENT DATA — the most important rules in this file.
+#
+# Every extraction output from this pipeline contains NOTE_TEXT, MRNs, CSNs
+# and dates of birth. None of it may ever reach a remote. These rules are
+# deliberately broad: it is better to have to force-add a harmless CSV than
+# to leak one note.
+# =============================================================================
+*.csv
+*.tsv
+*.xlsx
+*.xls
+*.rds
+*.RData
+*.rda
+*.feather
+*.parquet
+*.sav
+*.dta
+
+data/
+Data/
+input/
+output/
+outputs/
+extractions/
+notes/
+phi/
+scratch/
+
+# Pipeline artefacts by name, in case they land outside the folders above
+*_extraction*.csv
+*_nlp_*.csv
+ab_disagreements_*.csv
+ab_metrics_*.csv
+ab_field_agreement_*.csv
+ab_quality_audit_*.csv
+adjudications_all_*.csv
+gold_standard_consensus_*.csv
+autosave_*.csv
+resume_*.csv
+
+# Generated reports embed note text and quoted evidence spans
+*_Comparison_Report*.html
+*_Comparison_Report*.docx
+*comparison_report*.html
+*comparison_report*.docx
+*_report_*.html
+*_report_*.docx
+
+# ...but the synthetic, patient-free sample report is safe and is tracked
+!examples/SAMPLE_model_comparison_report.html
+
+# =============================================================================
+# CREDENTIALS AND LOCAL CONFIG
+# =============================================================================
+.Renviron
+.env
+.env.*
+!.Renviron.example
+service-account*.json
+*-service-account.json
+application_default_credentials.json
+gcloud-*.json
+*.pem
+*.key
+secrets.*
+
+# =============================================================================
+# R / RSTUDIO
+# =============================================================================
+.Rproj.user/
+.Rhistory
+.Rapp.history
+.Ruserdata
+*.Rproj
+.Renviron.local
+packrat/lib*/
+renv/library/
+renv/staging/
+.httr-oauth
+
+# =============================================================================
+# OS AND EDITOR
+# =============================================================================
+.DS_Store
+Thumbs.db
+desktop.ini
+*~
+*.swp
+.vscode/
+.idea/
