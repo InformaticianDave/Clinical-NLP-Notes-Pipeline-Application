@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><title>NICU LLM Extraction: Model Comparison Report</title><style>:root{--navy:#13294b;--navy2:#1f4068;--teal:#008c95;--ink:#1c1c1c;
+      --muted:#5a6672;--line:#d6dce3;--bg:#ffffff;--zebra:#f6f8fa;}
+*{box-sizing:border-box;}
+body{margin:0;padding:48px 56px 72px;background:var(--bg);color:var(--ink);
+  font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;
+  font-size:11.5pt;line-height:1.65;max-width:1100px;}
+h1{color:var(--navy);font-size:17pt;font-weight:650;letter-spacing:-0.01em;
+  margin:34px 0 12px;padding-bottom:7px;border-bottom:2px solid var(--teal);}
+h2{color:var(--navy2);font-size:12.5pt;font-weight:600;margin:24px 0 8px;}
+p{margin:0 0 12px;text-align:justify;}
+ul{margin:0 0 14px;padding-left:22px;}
+li{margin-bottom:9px;}
+table{border-collapse:collapse;width:100%;margin:10px 0 20px;font-size:9.8pt;}
+thead th{background:var(--navy);color:#fff;text-align:left;font-weight:600;
+  padding:7px 10px;border:1px solid var(--navy);}
+tbody td{padding:6px 10px;border:1px solid var(--line);vertical-align:top;
+  overflow-wrap:break-word;}
+tbody tr:nth-child(even){background:var(--zebra);}
+tbody tr td:first-child{font-weight:500;}
+.cover{border-bottom:3px solid var(--navy);padding-bottom:18px;margin-bottom:8px;}
+.cover h1{border:none;margin:0 0 6px;padding:0;font-size:22pt;}
+.sub{color:var(--teal);font-size:13pt;font-weight:600;margin-bottom:10px;
+  font-variant-numeric:tabular-nums;}
+.meta{color:var(--muted);font-size:9.5pt;line-height:1.5;}
+.none{color:var(--muted);font-style:italic;margin:0 0 16px;}
+.hint{background:#f0f6f7;border-left:3px solid var(--teal);padding:10px 14px;
+  margin:0 0 22px;font-size:9.5pt;color:var(--muted);}
+/* A wide table scrolls inside its own box on a narrow screen rather than
+   forcing the whole page sideways. Reset for print so nothing is clipped. */
+.tw{overflow-x:auto;-webkit-overflow-scrolling:touch;margin:10px 0 20px;}
+.tw table{margin:0;}
+@media (max-width:640px){
+  body{padding:24px 16px 48px;font-size:11pt;}
+  .cover h1{font-size:18pt;}
+  table{font-size:9pt;}
+  p{text-align:left;}
+}
+@media print{
+  body{padding:0;font-size:10pt;max-width:none;
+    -webkit-print-color-adjust:exact;print-color-adjust:exact;}
+  .hint{display:none;}
+  .tw{overflow:visible;}
+  h1{page-break-after:avoid;}
+  h2{page-break-after:avoid;}
+  table{page-break-inside:auto;}
+  tr{page-break-inside:avoid;}
+  thead{display:table-header-group;}
+}</style></head><body>
+<div style="background:#fff3cd;border:2px solid #d29922;border-radius:6px;padding:12px 16px;margin:0 0 18px 0;font-weight:600;">SYNTHETIC EXAMPLE. Every figure, row key and quoted phrase on this page is fabricated for layout demonstration. No patient data, no real extraction run.</div>
+<div class='cover'><h1>NICU LLM Extraction: Model Comparison Report</h1><div class='sub'>Gemini 2.5 Flash versus LM Studio (Qwen3-32B)</div><div class='meta'>Generated 2026-11-03 12:07:41 EST<br>Prepared by: A. Reviewer</div></div>
+<div class='hint'>To save a fixed-layout copy, print this page and choose &quot;Save as PDF&quot;. This block is hidden when printed.</div>
+<h1>1. Methods</h1>
+<p>Two independent large-language-model extraction runs over the same set of clinical notes were compared at the note level. Both runs used the same prompt and the same structured output schema; they differ only in the model that produced the output. The comparison evaluates (a) how often the two models reach the same clinical call, and (b) whether each model's output is internally consistent and evidence-grounded.</p>
+<h2>1.1 Inputs and row matching</h2>
+<div class='tw'><table><thead><tr><th>Item</th><th>Value</th></tr></thead><tbody><tr><td>Model A</td><td>Gemini 2.5 Flash</td></tr><tr><td>Model A file</td><td>ivh_gemini25flash_2026-11-02.xlsx</td></tr><tr><td>Model A rows</td><td>1,482</td></tr><tr><td>Model B</td><td>LM Studio (Qwen3-32B)</td></tr><tr><td>Model B file</td><td>ivh_lmstudio_qwen3_2026-11-03.csv</td></tr><tr><td>Model B rows</td><td>1,482</td></tr><tr><td>Row matching key</td><td>NOTE_ID</td></tr><tr><td>Rows matched</td><td>1,480</td></tr><tr><td>Rows only in A</td><td>2</td></tr><tr><td>Rows only in B</td><td>2</td></tr><tr><td>Duplicate keys dropped (A)</td><td>0</td></tr><tr><td>Duplicate keys dropped (B)</td><td>0</td></tr><tr><td>Primary field (case definition)</td><td>ivh_present</td></tr><tr><td>Values counted as positive</td><td>true, yes, 1</td></tr><tr><td>Detected diagnosis preset</td><td>IVH_PVL</td></tr><tr><td>Scoring mode</td><td>Agreement only (no ground truth supplied)</td></tr><tr><td>Gold-standard column</td><td>not used</td></tr></tbody></table></div>
+<p>A row contributes to the agreement statistics only when both models returned a usable value for the primary field. Rows where exactly one model returned no call are reported separately in Section 3.5 rather than being counted as agreement or disagreement, because a missing call is a different failure from a wrong call.</p>
+<h1>2. Statistical Analysis</h1>
+<h2>2.1 Agreement</h2>
+<p>Raw agreement is the proportion of jointly scored rows on which the two models returned the same call. Raw agreement alone is misleading when a finding is uncommon: if a condition is present in 5% of notes, two models that both call almost everything negative will agree on roughly 95% of rows without either one being informative. Cohen's kappa is therefore reported alongside it.</p>
+<h2>2.2 Testing for a systematic difference</h2>
+<p>Because both models scored the same notes, the two sets of calls are paired, and an unpaired test would be invalid. McNemar's test is used instead. An exact binomial test is used at every sample size rather than the chi-square approximation.</p>
+<h1>3. Results</h1>
+<h2>3.1 Summary</h2>
+<div class='tw'><table><thead><tr><th>Metric</th><th>Value</th></tr></thead><tbody><tr><td>Rows matched</td><td>1,480</td></tr><tr><td>Rows jointly scored</td><td>1,456</td></tr><tr><td>Rows in agreement</td><td>1,361</td></tr><tr><td>Raw agreement</td><td>93.5%</td></tr><tr><td>Cohen's kappa</td><td>0.782</td></tr><tr><td>Kappa interpretation</td><td>substantial</td></tr><tr><td>Discordant rows</td><td>95</td></tr><tr><td>Positive in Gemini 2.5 Flash only</td><td>62</td></tr><tr><td>Positive in LM Studio (Qwen3-32B) only</td><td>33</td></tr><tr><td>McNemar exact p</td><td>0.004</td></tr><tr><td>Hallucinated quote rate — Gemini 2.5 Flash</td><td>1.42%</td></tr><tr><td>Hallucinated quote rate — LM Studio (Qwen3-32B)</td><td>7.81%</td></tr></tbody></table></div>
+<h2>3.3 Per-field agreement</h2>
+<p>Compared fields, ordered worst agreement first. Fields are split by type, because the right question differs between them. For a continuous field such as a confidence score, exact agreement is close to meaningless, so agreement and kappa are left blank and the mean and maximum absolute difference and the correlation are reported instead.</p>
+<div class='tw'><table><thead><tr><th>field</th><th>source</th><th>type</th><th>n_compared</th><th>n_agree</th><th>pct_agree</th><th>kappa</th><th>mean_abs_diff</th><th>max_abs_diff</th><th>correlation</th><th>a_missing</th><th>b_missing</th></tr></thead><tbody><tr><td>cpvl_result</td><td>model output</td><td>categorical</td><td>17</td><td>17</td><td>1.000</td><td>—</td><td>—</td><td>—</td><td>—</td><td>1</td><td>1</td></tr><tr><td>echogenicity_only</td><td>model output</td><td>categorical</td><td>19</td><td>18</td><td>0.947</td><td>0.826</td><td>—</td><td>—</td><td>—</td><td>0</td><td>0</td></tr><tr><td>porencephalic_cyst</td><td>model output</td><td>categorical</td><td>19</td><td>18</td><td>0.947</td><td>0.000</td><td>—</td><td>—</td><td>—</td><td>0</td><td>0</td></tr><tr><td>negated</td><td>model output</td><td>categorical</td><td>19</td><td>15</td><td>0.789</td><td>0.000</td><td>—</td><td>—</td><td>—</td><td>0</td><td>0</td></tr><tr><td>imaging_modality</td><td>model output</td><td>categorical</td><td>17</td><td>17</td><td>1.000</td><td>1.000</td><td>—</td><td>—</td><td>—</td><td>1</td><td>1</td></tr><tr><td>cysts_documented</td><td>model output</td><td>categorical</td><td>19</td><td>19</td><td>1.000</td><td>—</td><td>—</td><td>—</td><td>—</td><td>0</td><td>0</td></tr><tr><td>where_found</td><td>model output</td><td>categorical</td><td>0</td><td>0</td><td>—</td><td>—</td><td>—</td><td>—</td><td>—</td><td>15</td><td>18</td></tr><tr><td>confidence</td><td>model output</td><td>continuous</td><td>19</td><td>—</td><td>—</td><td>—</td><td>0.092</td><td>0.310</td><td>0.412</td><td>0</td><td>0</td></tr></tbody></table></div>
+<h2>3.4 Integrity audit</h2>
+<div class='tw'><table><thead><tr><th>Model</th><th>Check</th><th>N</th><th>Denominator</th><th>Rate (%)</th><th>Definition</th></tr></thead><tbody><tr><td>Gemini 2.5 Flash</td><td>Rows in file</td><td>1,482</td><td>1,482</td><td>100.00</td><td></td></tr><tr><td>Gemini 2.5 Flash</td><td>Positive calls</td><td>318</td><td>1,458</td><td>21.81</td><td>ivh_present in {true, yes, 1}</td></tr><tr><td>Gemini 2.5 Flash</td><td>API / parse failures</td><td>6</td><td>1,482</td><td>0.40</td><td>review_status = failed_api or failed_parse</td></tr><tr><td>Gemini 2.5 Flash</td><td>Hallucinated quote — ivh_evidence_span</td><td>4</td><td>282</td><td>1.42</td><td>quote not found verbatim in NOTE_TEXT</td></tr><tr><td>Gemini 2.5 Flash</td><td>Positive call with no quote</td><td>2</td><td>318</td><td>0.63</td><td>positive but every evidence_span is empty</td></tr><tr><td>LM Studio (Qwen3-32B)</td><td>Rows in file</td><td>1,482</td><td>1,482</td><td>100.00</td><td></td></tr><tr><td>LM Studio (Qwen3-32B)</td><td>Positive calls</td><td>289</td><td>1,456</td><td>19.85</td><td>ivh_present in {true, yes, 1}</td></tr><tr><td>LM Studio (Qwen3-32B)</td><td>API / parse failures</td><td>24</td><td>1,482</td><td>1.62</td><td>review_status = failed_api or failed_parse</td></tr><tr><td>LM Studio (Qwen3-32B)</td><td>Hallucinated quote — ivh_evidence_span</td><td>20</td><td>256</td><td>7.81</td><td>quote not found verbatim in NOTE_TEXT</td></tr><tr><td>LM Studio (Qwen3-32B)</td><td>Schema type violation — ivh_worst_grade</td><td>11</td><td>1,404</td><td>0.78</td><td>declared NUMBER</td></tr></tbody></table></div>
+<h2>3.5 Disagreements</h2>
+<p>95 row(s) disagree on the primary field or had a call from only one model. The first 50 are listed below; the complete list is in the disagreements CSV export.</p>
+<div class='tw'><table><thead><tr><th>row_key</th><th>disagreement</th><th>ivh_present [A]</th><th>ivh_present [B]</th><th>A: ivh_evidence_span</th><th>B: ivh_evidence_span</th></tr></thead><tbody><tr><td>4471203</td><td>opposite call</td><td>true</td><td>false</td><td>Decreased intraventricular hemorrhage in the left lateral ventricle</td><td>—</td></tr><tr><td>4471891</td><td>opposite call</td><td>false</td><td>true</td><td>—</td><td>Lateral ventricles are mildly prominent bilaterally without definite hemorrhage.</td></tr><tr><td>4472015</td><td>opposite call</td><td>true</td><td>false</td><td>Germinal matrix hemorrhage, right.</td><td>—</td></tr><tr><td>4472560</td><td>one model gave no call</td><td>true</td><td>—</td><td>Layering intraventricular blood products in the bilateral occipital horns are unchanged.</td><td>—</td></tr><tr><td>4473102</td><td>opposite call</td><td>true</td><td>false</td><td>Small left subependymal hemorrhage without intraventricular extension.</td><td>—</td></tr></tbody></table></div>
+<p>Note text is omitted from this table for length and is retained in the CSV export. This list is the adjudication worklist: these are the notes a clinical reviewer must read to establish which model is correct.</p>
+<h1>4. Discussion</h1>
+<p>The two models returned the same call on 1,361 of 1,456 jointly scored notes (93.5%). Chance-corrected agreement was 0.782, conventionally read as substantial.</p>
+<p>The discordant rows did not split evenly (exact McNemar p = 0.004): Gemini 2.5 Flash called 62 case(s) positive that LM Studio (Qwen3-32B) did not, against 33 in the opposite direction. Gemini 2.5 Flash therefore applies a systematically lower threshold for calling a case positive. Whether that reflects better sensitivity or more false positives cannot be settled from these two files, because neither is a reference standard; it requires chart review of the disagreement list.</p>
+<h2>4.1 Limitations</h2>
+<ul><li>No reference standard was supplied, so nothing in this report establishes accuracy. Agreement between two models is not evidence that either is correct: models that share a blind spot agree perfectly.</li><li>Results reflect a single run of each model. Generation is not fully deterministic, so part of the observed disagreement is run-to-run variation rather than a stable difference between models.</li><li>The unit of analysis is the note, not the infant. A patient with several cranial studies contributes several rows, so these figures do not describe accuracy of a patient-level diagnosis.</li><li>Kappa is sensitive to how common the finding is. For a rare condition it can be low even when raw agreement is high, and it is not comparable across cohorts with different prevalence.</li></ul>
+<h1>Appendix. Reproducibility</h1>
+<div class='tw'><table><thead><tr><th>Item</th><th>Value</th></tr></thead><tbody><tr><td>Report generated</td><td>2026-11-03 12:07:41 EST</td></tr><tr><td>Hallucination rule</td><td>evidence span absent from NOTE_TEXT after case/quote/whitespace normalisation</td></tr><tr><td>Agreement test</td><td>exact McNemar (binomial, paired)</td></tr><tr><td>Interval method</td><td>Wilson score, 95%</td></tr></tbody></table></div>
+</body></html>

@@ -47,6 +47,46 @@ DEFAULT_VERTEX_CONFIG <- list(
   model    = "gemini-2.5-flash"
 )
 
+# -----------------------------------------------------------------------------
+# VERTEX MODEL CATALOG — drives the Model dropdown AND the Usage & Cost tab.
+# Prices are USD per 1M tokens, standard (non-batch) tier, prompts <= 200K tokens
+# (every NICU note is far below that). Checked Oct 2026 — re-verify periodically.
+# -----------------------------------------------------------------------------
+GEMINI_MODELS <- data.frame(
+  id = c("gemini-4-argon", "gemini-3.8-flash", "gemini-3.7-flash", "gemini-3.6-flash",
+         "gemini-3.5-flash", "gemini-3.5-flash-lite", "gemini-3.1-flash-lite",
+         "gemini-3.1-pro-preview", "gemini-2.5-pro", "gemini-2.5-flash", "gemini-2.5-flash-lite"),
+  price_in  = c(2.00, 0.75, 0.75, 0.75, 1.50, 0.30, 0.25, 2.00, 1.25, 0.30, 0.10),
+  price_out = c(10.00, 3.75, 3.75, 3.75, 9.00, 2.50, 1.50, 12.00, 10.00, 2.50, 0.40),
+  note = c(
+    "Rises to $4.00 / $20.00 on Dec 1, 2026.",
+    "Promotional rate through Dec 31, 2026; doubles to $1.50 / $7.50 on Jan 1, 2027.",
+    "Deprecated Oct 2026 \u2014 requests route to gemini-3.8-flash.",
+    "Promotional rate through Dec 31, 2026; doubles to $1.50 / $7.50 on Jan 1, 2027.",
+    "Deprecated Oct 2026 \u2014 requests route to gemini-3.6-flash.",
+    "",
+    "",
+    "Preview model. Prompts > 200K tokens: $4.00 / $18.00.",
+    "Prompts > 200K tokens: $2.50 / $15.00.",
+    "",
+    ""
+  ),
+  stringsAsFactors = FALSE
+)
+
+model_pricing <- function(model_id) {
+  hit <- GEMINI_MODELS[GEMINI_MODELS$id == model_id, , drop = FALSE]
+  if (nrow(hit) == 0) return(NULL)
+  as.list(hit[1, ])
+}
+
+gemini_model_choices <- function() {
+  stats::setNames(
+    GEMINI_MODELS$id,
+    sprintf("%s  \u00b7  $%.2f in / $%.2f out", GEMINI_MODELS$id, GEMINI_MODELS$price_in, GEMINI_MODELS$price_out)
+  )
+}
+
 DEFAULT_LM_CONFIG <- list(
   base_url = "http://localhost:1234/v1",
   model    = "biomistral"
@@ -70,7 +110,7 @@ DEFAULT_PROMPT_TEMPLATE <- paste0(
 # DIAGNOSIS PRESETS
 # =============================================================================
 DIAGNOSIS_PRESETS <- list(
-  
+
   NEC = list(
     label  = "NEC \u2014 Necrotizing Enterocolitis",
     target = "necrotizing enterocolitis (NEC)",
@@ -129,7 +169,7 @@ DIAGNOSIS_PRESETS <- list(
     cols       = c("nec_present", "nec_basis", "clinical_signs", "imaging_findings", "fip_instead", "evidence_span", "where_found", "negated", "confidence"),
     col_labels = c("NEC Present", "Basis", "Clinical Signs", "Imaging Findings", "FIP Instead", "Evidence Span", "Where Found", "Negated", "Confidence")
   ),
-  
+
   IVH = list(
     label  = "IVH \u2014 Periventricular-Intraventricular Hemorrhage",
     target = "periventricular-intraventricular hemorrhage (PIH/IVH)",
@@ -227,7 +267,7 @@ DIAGNOSIS_PRESETS <- list(
     cols       = c("ivh_present", "worst_grade", "laterality", "hydrocephalus", "imaging_modality", "evidence_span", "where_found", "is_followup", "negated", "confidence"),
     col_labels = c("IVH Present", "Worst Grade", "Laterality", "Hydrocephalus", "Imaging Modality", "Evidence Span", "Where Found", "Follow-up Study", "Negated", "Confidence")
   ),
-  
+
   PVL = list(
     label  = "PVL \u2014 Cystic Periventricular Leukomalacia",
     target = "cystic periventricular leukomalacia (cPVL)",
@@ -286,7 +326,7 @@ DIAGNOSIS_PRESETS <- list(
     cols       = c("cpvl_result", "cysts_documented", "echogenicity_only", "porencephalic_cyst", "imaging_modality", "evidence_span", "where_found", "negated", "confidence"),
     col_labels = c("cPVL Result", "Cysts Documented", "Echogenicity Only", "Porencephalic Cyst", "Imaging Modality", "Evidence Span", "Where Found", "Negated", "Confidence")
   ),
-  
+
   # ---------------------------------------------------------------------------
   # COMBINED: IVH + PVL from one cranial-imaging report (single Vertex pass).
   # ---------------------------------------------------------------------------
@@ -418,7 +458,7 @@ DIAGNOSIS_PRESETS <- list(
                    "cPVL Evidence", "cPVL Where", "cPVL Negated", "cPVL Conf",
                    "Imaging Modality", "Study Normal", "Follow-up Study", "Other Findings")
   ),
-  
+
   ROP = list(
     label  = "ROP \u2014 Retinopathy of Prematurity",
     target = "retinopathy of prematurity (ROP)",
@@ -479,7 +519,7 @@ DIAGNOSIS_PRESETS <- list(
     cols       = c("rop_present", "worst_stage", "zone", "plus_disease", "treatment", "laterality", "evidence_span", "where_found", "negated", "confidence"),
     col_labels = c("ROP Present", "Worst Stage", "Zone", "Plus Disease", "Treatment", "Laterality", "Evidence Span", "Where Found", "Negated", "Confidence")
   ),
-  
+
   # ---------------------------------------------------------------------------
   # PDA — Patent Ductus Arteriosus (Echo + CXR combined, single pipeline pass)
   # Input file must have a column named 'pda_tier' with values "1" or "2".
@@ -607,7 +647,7 @@ DIAGNOSIS_PRESETS <- list(
                    "Normal Cardiac Silhouette", "CXR Supports PDA",
                    "Evidence Span", "Where Found", "Negated", "Confidence")
   ),
-  
+
   # (PDA_Echo and PDA_CXR kept as legacy single-type presets.)
   PDA_Echo = list(
     label  = "PDA \u2014 Echo (TTE)",
@@ -684,7 +724,7 @@ DIAGNOSIS_PRESETS <- list(
                    "LA:Ao Ratio", "Treatment Recommended", "Spontaneous Closure",
                    "Evidence Span", "Where Found", "Negated", "Confidence")
   ),
-  
+
   PDA_CXR = list(
     label  = "PDA \u2014 CXR Support (Tier 2)",
     target = "cardiomegaly or increased pulmonary vasculature on chest radiograph",
@@ -747,7 +787,7 @@ DIAGNOSIS_PRESETS <- list(
                    "Pulmonary Edema", "Normal Cardiac Silhouette",
                    "Evidence Span", "Where Found", "Negated", "Confidence")
   ),
-  
+
   custom = list(
     label  = "Custom",
     target = DEFAULT_PROMPT_TARGET,
@@ -848,19 +888,19 @@ check_gcp_auth <- function() {
   gcloud_cmd <- find_gcloud()
   if (is.null(gcloud_cmd))
     return(list(ok = FALSE, token = NULL, msg = "gcloud CLI not found"))
-  
+
   token_result <- suppressWarnings(
     tryCatch(
       system(paste(gcloud_cmd, "auth application-default print-access-token 2>&1"), intern = TRUE),
       error = function(e) NULL
     )
   )
-  
+
   if (is.null(token_result) || length(token_result) == 0 ||
       any(grepl("ERROR|error|not found|could not|invalid|expired", token_result, ignore.case = TRUE))) {
     return(list(ok = FALSE, token = NULL, msg = "Run: gcloud auth application-default login"))
   }
-  
+
   list(ok = TRUE, token = trimws(token_result[1]), msg = NULL)
 }
 
@@ -869,7 +909,7 @@ call_gemini <- function(prompt, token, ai_cfg, schema) {
     "https://%s-aiplatform.googleapis.com/v1/projects/%s/locations/%s/publishers/google/models/%s:generateContent",
     ai_cfg$location, ai_cfg$project, ai_cfg$location, ai_cfg$model
   )
-  
+
   make_body <- function(use_schema) {
     b <- list(
       contents = list(
@@ -890,7 +930,7 @@ call_gemini <- function(prompt, token, ai_cfg, schema) {
     if (use_schema) b$generationConfig$responseSchema <- schema
     b
   }
-  
+
   do_call <- function(body) {
     tryCatch({
       httr2::request(endpoint) |>
@@ -901,52 +941,66 @@ call_gemini <- function(prompt, token, ai_cfg, schema) {
         httr2::req_perform()
     }, error = function(e) NULL)
   }
-  
+
+  # Pull token-usage counts out of a Vertex response, when present.
+  extract_usage <- function(result) {
+    um <- result$usageMetadata
+    if (is.null(um)) return(NULL)
+    list(
+      input_tokens  = um$promptTokenCount %||% NA_real_,
+      output_tokens = sum(c(um$candidatesTokenCount, um$thoughtsTokenCount), na.rm = TRUE),
+      thought_tokens = um$thoughtsTokenCount %||% 0,
+      total_tokens  = um$totalTokenCount %||% NA_real_
+    )
+  }
+
   extract <- function(response) {
     if (is.null(response))
-      return(list(text = NA_character_, reason = "NETWORK_CRASH", detail = NULL))
-    
+      return(list(text = NA_character_, reason = "NETWORK_CRASH", detail = NULL, usage = NULL))
+
     status <- httr2::resp_status(response)
     if (status >= 400) {
       err_body <- tryCatch(httr2::resp_body_string(response), error = function(e) "")
       return(list(text = NA_character_,
                   reason = sprintf("HTTP_ERROR_%d", status),
-                  detail = err_body))
+                  detail = err_body, usage = NULL))
     }
-    
+
     result <- tryCatch(httr2::resp_body_json(response), error = function(e) NULL)
     if (is.null(result))
-      return(list(text = NA_character_, reason = "RESPONSE_NOT_JSON", detail = NULL))
-    
+      return(list(text = NA_character_, reason = "RESPONSE_NOT_JSON", detail = NULL, usage = NULL))
+
+    usage <- extract_usage(result)
+
     # Prompt-level block (safety filter on the input itself)
     if (!is.null(result$promptFeedback) && !is.null(result$promptFeedback$blockReason))
       return(list(text = NA_character_,
                   reason = paste0("PROMPT_BLOCKED_", result$promptFeedback$blockReason),
-                  detail = NULL))
-    
+                  detail = NULL, usage = usage))
+
     if (is.null(result$candidates) || length(result$candidates) == 0)
-      return(list(text = NA_character_, reason = "NO_CANDIDATES", detail = NULL))
-    
+      return(list(text = NA_character_, reason = "NO_CANDIDATES", detail = NULL, usage = usage))
+
     candidate     <- result$candidates[[1]]
     finish_reason <- candidate$finishReason %||% "NO_FINISH_REASON"
     parts         <- candidate$content$parts
-    
+
     if (!is.null(parts) && length(parts) > 0 && !is.null(parts[[1]]$text)) {
       txt <- parts[[1]]$text
       if (nzchar(trimws(txt)))
-        return(list(text = txt, reason = finish_reason, detail = NULL))
+        return(list(text = txt, reason = finish_reason, detail = NULL, usage = usage))
     }
-    
+
     # Candidate returned but carried no usable text — report WHY.
     list(text = NA_character_,
          reason = paste0("EMPTY_CANDIDATE_", finish_reason),
-         detail = NULL)
+         detail = NULL, usage = usage)
   }
-  
+
   # Attempt 1: schema-constrained (preferred; gives typed output)
   r1 <- extract(do_call(make_body(TRUE)))
   if (!is.na(r1$text)) return(r1)
-  
+
   # Attempt 2: schema-free fallback. Vertex sometimes suppresses the constrained
   # response on complex notes; free-form output still parses after repair_json.
   r2 <- extract(do_call(make_body(FALSE)))
@@ -954,11 +1008,13 @@ call_gemini <- function(prompt, token, ai_cfg, schema) {
     r2$reason <- paste0(r2$reason, "+SCHEMA_FALLBACK")
     return(r2)
   }
-  
-  # Both failed — surface the most informative reason.
+
+  # Both failed — surface the most informative reason. Keep whichever attempt
+  # actually reported usage (a failed parse can still have billed tokens).
   list(text   = NA_character_,
        reason = paste0(r1$reason, " | fallback: ", r2$reason),
-       detail = r1$detail %||% r2$detail)
+       detail = r1$detail %||% r2$detail,
+       usage  = r1$usage %||% r2$usage)
 }
 
 # =============================================================================
@@ -975,25 +1031,25 @@ check_lmstudio <- function(base_url) {
       httr2::req_error(is_error = function(resp) FALSE) |>
       httr2::req_perform()
   }, error = function(e) NULL)
-  
+
   if (is.null(response))
     return(list(ok = FALSE, models = NULL, msg = "Cannot reach LM Studio \u2014 is it running?"))
-  
+
   status <- httr2::resp_status(response)
   if (status >= 400)
     return(list(ok = FALSE, models = NULL, msg = sprintf("HTTP %d from LM Studio", status)))
-  
+
   result <- tryCatch(httr2::resp_body_json(response), error = function(e) NULL)
   models <- character(0)
   if (!is.null(result$data))
     models <- vapply(result$data, function(x) as.character(x$id), character(1))
-  
+
   list(ok = TRUE, models = models, msg = NULL)
 }
 
 call_lmstudio <- function(prompt, base_url, model) {
   endpoint <- paste0(lm_base_url_clean(base_url), "/chat/completions")
-  
+
   # BioMistral rejects system role — fold instructions into user message
   combined_prompt <- paste0(
     "You are a clinical NLP assistant. ",
@@ -1001,7 +1057,7 @@ call_lmstudio <- function(prompt, base_url, model) {
     "No markdown fences, no preamble, no explanation \u2014 raw JSON only.\n\n",
     prompt
   )
-  
+
   body <- list(
     model    = model,
     messages = list(
@@ -1010,7 +1066,7 @@ call_lmstudio <- function(prompt, base_url, model) {
     temperature = 0.1,
     max_tokens  = 4096
   )
-  
+
   response <- tryCatch({
     httr2::request(endpoint) |>
       httr2::req_body_json(body) |>
@@ -1018,29 +1074,38 @@ call_lmstudio <- function(prompt, base_url, model) {
       httr2::req_error(is_error = function(resp) FALSE) |>
       httr2::req_perform()
   }, error = function(e) NULL)
-  
+
   if (is.null(response))
     return(list(text = NA_character_, reason = "NETWORK_CRASH", detail = NULL))
-  
+
   if (httr2::resp_status(response) >= 400) {
     err_body <- tryCatch(httr2::resp_body_string(response), error = function(e) "")
     return(list(text = NA_character_,
                 reason = sprintf("HTTP_ERROR_%d", httr2::resp_status(response)),
                 detail = err_body))
   }
-  
+
   result <- tryCatch(httr2::resp_body_json(response), error = function(e) NULL)
   if (is.null(result))
-    return(list(text = NA_character_, reason = "RESPONSE_NOT_JSON", detail = NULL))
-  
+    return(list(text = NA_character_, reason = "RESPONSE_NOT_JSON", detail = NULL, usage = NULL))
+
+  usage <- NULL
+  if (!is.null(result$usage)) {
+    usage <- list(
+      input_tokens  = result$usage$prompt_tokens %||% NA_real_,
+      output_tokens = result$usage$completion_tokens %||% NA_real_,
+      total_tokens  = result$usage$total_tokens %||% NA_real_
+    )
+  }
+
   if (!is.null(result$choices) && length(result$choices) > 0) {
     content <- result$choices[[1]]$message$content
     if (!is.null(content) && nchar(trimws(content)) > 0)
-      return(list(text = content, reason = "stop", detail = NULL))
-    return(list(text = NA_character_, reason = "EMPTY_CHOICE_CONTENT", detail = NULL))
+      return(list(text = content, reason = "stop", detail = NULL, usage = usage))
+    return(list(text = NA_character_, reason = "EMPTY_CHOICE_CONTENT", detail = NULL, usage = usage))
   }
-  
-  list(text = NA_character_, reason = "NO_CHOICES", detail = NULL)
+
+  list(text = NA_character_, reason = "NO_CHOICES", detail = NULL, usage = usage)
 }
 
 # =============================================================================
@@ -1099,6 +1164,1036 @@ load_uploaded_file <- function(path, name) {
     )
   }, error = function(e) stop(e$message))
 }
+
+# =============================================================================
+# MODEL A/B COMPARISON — SCORING HELPERS
+#
+# These power the "Model A/B" tab, which scores two runs of the SAME notes by
+# two different models against each other.
+#
+# A NOTE ON WHAT CAN AND CANNOT BE MEASURED HERE:
+#   Precision, recall and F1 are defined against a GROUND TRUTH. Two model
+#   outputs alone do not contain one. Comparing model B to model A measures
+#   AGREEMENT, not accuracy — if both models are wrong in the same way, they
+#   agree perfectly and every metric looks excellent. The tab therefore
+#   defaults to agreement statistics (Cohen's kappa, McNemar) and only reports
+#   precision/recall when the user explicitly nominates a reference, with the
+#   reference named in the output so the number is never mistaken for
+#   validated accuracy.
+#
+#   The quality audit below is the exception: hallucinated quotes, parse
+#   failures and schema violations are objectively checkable from the file
+#   itself with NO gold standard, because they are internal-consistency
+#   failures rather than clinical judgments.
+# =============================================================================
+
+ab_norm <- function(x) tolower(trimws(as.character(x)))
+
+# Treat empty strings and the usual null spellings as "no value", not as a level.
+ab_blank <- function(x) {
+  v <- tolower(trimws(as.character(x)))
+  is.na(x) | is.na(v) | !nzchar(v) | v %in% c("na", "null", "n/a", "none", "nan")
+}
+
+# Map a column to TRUE/FALSE/NA given the strings that count as positive.
+ab_to_logical <- function(x, positive_vals) {
+  v <- ab_norm(x)
+  out <- v %in% ab_norm(positive_vals)
+  out[ab_blank(x)] <- NA
+  out
+}
+
+# Wilson score interval — correct at small n and near 0/1, where the normal
+# approximation produces impossible bounds.
+ab_wilson_ci <- function(k, n, conf = 0.95) {
+  if (is.na(k) || is.na(n) || n == 0) return(c(NA_real_, NA_real_))
+  z <- stats::qnorm(1 - (1 - conf) / 2)
+  phat <- k / n
+  denom <- 1 + z^2 / n
+  center <- (phat + z^2 / (2 * n)) / denom
+  half <- (z * sqrt(phat * (1 - phat) / n + z^2 / (4 * n^2))) / denom
+  c(max(0, center - half), min(1, center + half))
+}
+
+ab_fmt_rate <- function(k, n) {
+  if (is.na(k) || is.na(n) || n == 0) return("\u2014")
+  ci <- ab_wilson_ci(k, n)
+  sprintf("%.3f  [%.3f\u2013%.3f]", k / n, ci[1], ci[2])
+}
+
+ab_fmt_num <- function(x, digits = 3) {
+  if (is.null(x) || length(x) == 0 || is.na(x)) return("\u2014")
+  formatC(x, format = "f", digits = digits)
+}
+
+# Full binary confusion matrix. `gold` is whatever the user nominated as the
+# reference; it is not necessarily a clinical gold standard.
+ab_binary_metrics <- function(gold, pred) {
+  keep <- !is.na(gold) & !is.na(pred)
+  g <- gold[keep]; p <- pred[keep]
+  TP <- sum(g & p); FP <- sum(!g & p); FN <- sum(g & !p); TN <- sum(!g & !p)
+  N <- TP + FP + FN + TN
+  prec <- if ((TP + FP) > 0) TP / (TP + FP) else NA_real_
+  rec  <- if ((TP + FN) > 0) TP / (TP + FN) else NA_real_
+  f1 <- NA_real_
+  if (!is.na(prec) && !is.na(rec) && (prec + rec) > 0) {
+    f1 <- 2 * prec * rec / (prec + rec)
+  }
+  list(
+    N = N, TP = TP, FP = FP, FN = FN, TN = TN,
+    precision   = prec,
+    recall      = rec,
+    f1          = f1,
+    specificity = if ((TN + FP) > 0) TN / (TN + FP) else NA_real_,
+    npv         = if ((TN + FN) > 0) TN / (TN + FN) else NA_real_,
+    accuracy    = if (N > 0) (TP + TN) / N else NA_real_
+  )
+}
+
+# Cohen's kappa, general categorical form (works for binary too).
+# Chance-corrected: with a rare finding, two models can agree on 95% of rows
+# purely because both call almost everything negative. Kappa strips that out.
+ab_cohen_kappa <- function(a, b) {
+  keep <- !is.na(a) & !is.na(b)
+  a <- as.character(a)[keep]; b <- as.character(b)[keep]
+  n <- length(a)
+  if (n == 0) return(NA_real_)
+  lv <- union(unique(a), unique(b))
+  if (length(lv) < 2) return(NA_real_)
+  po <- sum(a == b) / n
+  pe <- sum(vapply(lv, function(l) (sum(a == l) / n) * (sum(b == l) / n), numeric(1)))
+  if (!is.finite(pe) || pe >= 1) return(NA_real_)
+  (po - pe) / (1 - pe)
+}
+
+# Exact McNemar test on the discordant pairs. This is the right paired test for
+# "do these two models differ on the same notes" — the concordant rows carry no
+# information about a difference. Exact binomial is used at every n, so there is
+# no chi-square approximation to defend at small discordant counts.
+ab_mcnemar <- function(a, b) {
+  keep <- !is.na(a) & !is.na(b)
+  a <- a[keep]; b <- b[keep]
+  a_only <- sum(a & !b)
+  b_only <- sum(!a & b)
+  nd <- a_only + b_only
+  p <- NA_real_
+  if (nd == 0) {
+    p <- 1
+  } else {
+    p <- tryCatch(stats::binom.test(a_only, nd, 0.5)$p.value,
+                  error = function(e) NA_real_)
+  }
+  list(a_only = a_only, b_only = b_only, n_discordant = nd, p_value = p)
+}
+
+# --- Hallucinated-quote detection -----------------------------------------
+# Normalize away differences that are not fabrication: case, smart quotes and
+# runs of whitespace. Without this, a curly apostrophe reads as a hallucination.
+ab_normalize_match <- function(x) {
+  x <- tolower(x)
+  x <- gsub("[\u2018\u2019]", "'", x)
+  x <- gsub("[\u201C\u201D]", "\"", x)
+  x <- gsub("\\s+", " ", x)
+  trimws(x)
+}
+
+# TRUE = quote really is in the note, FALSE = fabricated/paraphrased,
+# NA = no quote was claimed (a negative row), which is not a failure.
+ab_is_verbatim <- function(evidence, note_text) {
+  if (is.na(evidence) || is.na(note_text)) return(NA)
+  if (!nzchar(trimws(as.character(evidence)))) return(NA)
+  ev <- ab_normalize_match(as.character(evidence))
+  nt <- ab_normalize_match(as.character(note_text))
+  if (!nzchar(ev)) return(NA)
+  if (grepl(ev, nt, fixed = TRUE)) return(TRUE)
+  ev2 <- gsub("[.,;:]+$", "", ev)
+  if (nzchar(ev2) && grepl(ev2, nt, fixed = TRUE)) return(TRUE)
+  FALSE
+}
+
+ab_verbatim_vec <- function(evidence, note_text) {
+  n <- length(evidence)
+  if (n == 0) return(logical(0))
+  out <- rep(NA, n)
+  for (i in seq_len(n)) out[i] <- ab_is_verbatim(evidence[i], note_text[i])
+  as.logical(out)
+}
+
+ab_evidence_cols <- function(df) grep("evidence_span$", names(df), value = TRUE)
+
+# Guess which preset produced a file, by column overlap, so the schema audit
+# knows which fields are supposed to be numeric vs boolean.
+ab_detect_preset <- function(cols) {
+  best <- NULL; best_n <- 0
+  for (k in names(DIAGNOSIS_PRESETS)) {
+    p <- DIAGNOSIS_PRESETS[[k]]
+    if (is.null(p$cols)) next
+    n <- length(intersect(p$cols, cols))
+    if (n > best_n) { best_n <- n; best <- k }
+  }
+  if (best_n >= 2) best else NULL
+}
+
+# Values that a BOOLEAN field is allowed to hold once stringified.
+AB_BOOL_OK <- c("true", "false", "t", "f", "yes", "no", "1", "0")
+
+# Count cells that violate the preset's declared JSON schema type. A NUMBER
+# field holding "grade 3" or a BOOLEAN holding "probable" means the model
+# ignored the schema, which is a failure mode worth counting separately from
+# getting the clinical answer wrong.
+ab_schema_violations <- function(df, preset_key) {
+  if (is.null(preset_key)) return(data.frame())
+  props <- DIAGNOSIS_PRESETS[[preset_key]]$schema$properties
+  if (is.null(props)) return(data.frame())
+  rows <- list()
+  for (fld in names(props)) {
+    if (!(fld %in% names(df))) next
+    ty <- props[[fld]]$type
+    vals <- df[[fld]]
+    nb <- !ab_blank(vals)
+    n_checked <- sum(nb)
+    if (n_checked == 0) next
+    bad <- 0
+    if (identical(ty, "NUMBER") || identical(ty, "INTEGER")) {
+      num <- suppressWarnings(as.numeric(as.character(vals[nb])))
+      bad <- sum(is.na(num))
+    } else if (identical(ty, "BOOLEAN")) {
+      bad <- sum(!(ab_norm(vals[nb]) %in% AB_BOOL_OK))
+    } else {
+      next
+    }
+    if (bad > 0) {
+      rows[[length(rows) + 1]] <- data.frame(
+        field = fld, declared_type = ty, n_checked = n_checked,
+        n_violations = bad, stringsAsFactors = FALSE)
+    }
+  }
+  if (length(rows) == 0) return(data.frame())
+  do.call(rbind, rows)
+}
+
+# Per-model integrity audit. Everything here is computable from one file alone.
+ab_quality_audit <- function(df, label, primary_field, pos_vals,
+                             note_col = "NOTE_TEXT", preset_key = NULL) {
+  rows <- list()
+  add <- function(metric, count, denom, detail = "") {
+    rows[[length(rows) + 1]] <<- data.frame(
+      model = label, metric = metric, count = count, denom = denom,
+      rate = if (!is.na(denom) && denom > 0) count / denom else NA_real_,
+      detail = detail, stringsAsFactors = FALSE)
+  }
+  n <- nrow(df)
+  add("Rows in file", n, n, "")
+
+  if (!is.null(primary_field) && primary_field %in% names(df)) {
+    pv <- ab_to_logical(df[[primary_field]], pos_vals)
+    add("Positive calls", sum(pv, na.rm = TRUE), sum(!is.na(pv)),
+        paste0(primary_field, " in {", paste(pos_vals, collapse = ", "), "}"))
+    add("No value on primary field", sum(is.na(pv)), n,
+        paste0(primary_field, " blank or null"))
+  }
+
+  if ("review_status" %in% names(df)) {
+    rs <- ab_norm(df$review_status)
+    add("API / parse failures", sum(rs %in% c("failed_api", "failed_parse")), n,
+        "review_status = failed_api or failed_parse")
+    add("No call returned", sum(rs == "no_call"), n, "review_status = no_call")
+    add("Flagged for inclusion", sum(rs == "include"), n, "review_status = include")
+    add("Needs human review (low confidence)",
+        sum(rs %in% c("review_low_conf", "review_no_conf")), n,
+        "review_status = review_low_conf or review_no_conf")
+  }
+
+  ev_cols <- ab_evidence_cols(df)
+  if (length(ev_cols) > 0 && note_col %in% names(df) && n > 0) {
+    for (ec in ev_cols) {
+      v <- ab_verbatim_vec(as.character(df[[ec]]), as.character(df[[note_col]]))
+      n_claimed <- sum(!is.na(v))
+      add(paste0("Hallucinated quote \u2014 ", ec), sum(!is.na(v) & !v), n_claimed,
+          "quote not found verbatim in NOTE_TEXT")
+    }
+  } else if (length(ev_cols) > 0) {
+    add("Hallucinated quote", NA_integer_, NA_integer_,
+        "cannot check \u2014 NOTE_TEXT column not in this file")
+  }
+
+  # Two mirror-image breaches of the evidence-span contract. Both are schema
+  # compliance, not clinical accuracy, and both are checkable with no reference
+  # standard.
+  if (!is.null(primary_field) && primary_field %in% names(df) && length(ev_cols) > 0) {
+    pv <- ab_to_logical(df[[primary_field]], pos_vals)
+    ev_any <- rep(FALSE, nrow(df))
+    for (ec in ev_cols) ev_any <- ev_any | !ab_blank(df[[ec]])
+
+    # (a) A positive call with no supporting quote breaks the audit trail the
+    #     whole evidence-span design exists to provide.
+    n_pos <- sum(pv, na.rm = TRUE)
+    add("Positive call with no quote", sum(!is.na(pv) & pv & !ev_any), n_pos,
+        "positive but every evidence_span is empty")
+
+    # (b) The inverse: a quote attached to a NEGATIVE call, where the prompt
+    #     requires evidence_span to be null. This matters because such a span
+    #     can never be verbatim (there is no affirming sentence to quote), so it
+    #     is counted as a hallucinated quote and inflates that rate -- making a
+    #     model look like it fabricates diagnostic evidence when what it is
+    #     really doing is ignoring the "null on negatives" instruction. Counting
+    #     it separately keeps the two failure modes apart.
+    neg <- !is.na(pv) & !pv
+    n_neg <- sum(neg)
+    add("Quote supplied on a negative call", sum(neg & ev_any), n_neg,
+        "negative call but an evidence_span was returned; schema requires null")
+  }
+
+  for (cc in grep("confidence$", names(df), value = TRUE)) {
+    num <- suppressWarnings(as.numeric(as.character(df[[cc]])))
+    nb <- !is.na(num)
+    if (sum(nb) == 0) next
+    add(paste0("Confidence outside 0\u20131 \u2014 ", cc),
+        sum(nb & (num < 0 | num > 1)), sum(nb), "value out of range")
+  }
+
+  sv <- ab_schema_violations(df, preset_key)
+  if (nrow(sv) > 0) {
+    for (i in seq_len(nrow(sv))) {
+      add(paste0("Schema type violation \u2014 ", sv$field[i]),
+          sv$n_violations[i], sv$n_checked[i],
+          paste0("declared ", sv$declared_type[i]))
+    }
+  }
+
+  do.call(rbind, rows)
+}
+
+# Per-field agreement across every shared column the user asked to compare.
+# A field is treated as continuous only when it parses as numeric AND carries a
+# genuinely fractional value somewhere. That distinction matters: exact-match
+# agreement on a 0-1 confidence score is near-meaningless (two models almost
+# never return the identical decimal), whereas exact match on an integer grade,
+# stage or gestational age is exactly the right question. Using "is it numeric"
+# alone would wrongly silence grade and stage.
+ab_is_continuous <- function(x, y) {
+  nx <- suppressWarnings(as.numeric(as.character(x)))
+  ny <- suppressWarnings(as.numeric(as.character(y)))
+  ok <- !is.na(nx) | !is.na(ny)
+  if (!any(ok)) return(FALSE)
+  vals <- c(nx[!is.na(nx)], ny[!is.na(ny)])
+  if (length(vals) == 0) return(FALSE)
+  # numeric for most non-blank cells, and at least one non-integer value
+  n_nonblank <- sum(!ab_blank(x) | !ab_blank(y))
+  frac_numeric <- length(vals) / max(1, 2 * n_nonblank)
+  any(abs(vals - round(vals)) > 1e-9) && frac_numeric > 0.5
+}
+
+ab_field_agreement <- function(joined, fields, model_cols = NULL) {
+  rows <- list()
+  for (f in fields) {
+    ca <- paste0(f, "__A"); cb <- paste0(f, "__B")
+    if (!(ca %in% names(joined)) || !(cb %in% names(joined))) next
+    va <- joined[[ca]]; vb <- joined[[cb]]
+    ba <- ab_blank(va); bb <- ab_blank(vb)
+    keep <- !ba & !bb
+    n_cmp <- sum(keep)
+
+    na_ <- suppressWarnings(as.numeric(as.character(va)))
+    nb_ <- suppressWarnings(as.numeric(as.character(vb)))
+    both_num <- !is.na(na_) & !is.na(nb_)
+    cont <- ab_is_continuous(va, vb)
+
+    mad <- NA_real_; mxd <- NA_real_; rho <- NA_real_
+    if (sum(both_num) > 0) {
+      d <- abs(na_[both_num] - nb_[both_num])
+      mad <- mean(d); mxd <- max(d)
+      if (sum(both_num) >= 3) {
+        sa <- stats::sd(na_[both_num]); sb <- stats::sd(nb_[both_num])
+        # Correlation is undefined when either side is constant; report NA
+        # rather than letting cor() warn and return NA silently.
+        if (is.finite(sa) && is.finite(sb) && sa > 0 && sb > 0)
+          rho <- suppressWarnings(stats::cor(na_[both_num], nb_[both_num]))
+      }
+    }
+
+    if (cont) {
+      # Exact match and kappa are not meaningful here, so they are left empty
+      # instead of being reported as a near-zero agreement that looks alarming.
+      n_agree <- NA_integer_; pct <- NA_real_; kap <- NA_real_
+    } else {
+      n_agree <- if (n_cmp > 0) sum(ab_norm(va[keep]) == ab_norm(vb[keep])) else 0L
+      pct <- if (n_cmp > 0) n_agree / n_cmp else NA_real_
+      ka <- ifelse(ba, NA_character_, ab_norm(va))
+      kb <- ifelse(bb, NA_character_, ab_norm(vb))
+      kap <- ab_cohen_kappa(ka, kb)
+    }
+
+    src <- if (is.null(model_cols)) "" else
+      if (f %in% model_cols) "model output" else "passthrough"
+
+    rows[[length(rows) + 1]] <- data.frame(
+      field = f,
+      source = src,
+      type = if (cont) "continuous" else "categorical",
+      n_compared = n_cmp,
+      n_agree = n_agree,
+      pct_agree = pct,
+      kappa = kap,
+      mean_abs_diff = mad,
+      max_abs_diff = mxd,
+      correlation = rho,
+      a_missing = sum(ba),
+      b_missing = sum(bb),
+      stringsAsFactors = FALSE)
+  }
+  if (length(rows) == 0) return(data.frame())
+  out <- do.call(rbind, rows)
+  if (all(!nzchar(out$source))) out$source <- NULL
+  # Worst agreement first, but continuous fields (pct_agree = NA) sort last
+  # instead of floating to the top on a meaningless near-zero exact-match rate.
+  out[order(out$pct_agree, na.last = TRUE), , drop = FALSE]
+}
+
+# Drop columns that are entirely empty. The per-field table carries columns that
+# only apply to one kind of field (correlation and max difference for continuous
+# ones), so on an all-categorical run three columns would otherwise print as a
+# wall of em dashes and crowd the page. The first column is always kept so a
+# table can never come back with nothing in it.
+ab_drop_empty_cols <- function(df) {
+  if (is.null(df) || nrow(df) == 0 || ncol(df) <= 1) return(df)
+  keep <- vapply(seq_along(df), function(i) {
+    if (i == 1) return(TRUE)
+    any(!ab_blank(df[[i]]))
+  }, logical(1))
+  df[, keep, drop = FALSE]
+}
+
+# Landis & Koch bands — gives a kappa a plain-language reading for
+# collaborators who do not work with agreement statistics daily.
+ab_kappa_label <- function(k) {
+  if (is.null(k) || length(k) == 0 || is.na(k)) return("not estimable")
+  if (k < 0)    return("worse than chance")
+  if (k < 0.20) return("slight")
+  if (k < 0.40) return("fair")
+  if (k < 0.60) return("moderate")
+  if (k < 0.80) return("substantial")
+  "almost perfect"
+}
+
+# ---- DOCX report ---------------------------------------------------------
+# Rendered with officer. Kept as a plain function (not a Shiny reactive) so it
+# can be unit-tested or called from a scheduled script later.
+
+# Coerce a results table into something Word can render: whole numbers stay
+# whole, decimals get 3 digits, long strings are truncated, NA becomes an
+# em dash rather than the string "NA".
+ab_doc_prep_table <- function(df, max_chars = 150, drop_cols = NULL, max_rows = NULL) {
+  if (is.null(df) || nrow(df) == 0) return(NULL)
+  d <- as.data.frame(df, stringsAsFactors = FALSE)
+  if (!is.null(drop_cols)) d <- d[, setdiff(names(d), drop_cols), drop = FALSE]
+  if (!is.null(max_rows) && nrow(d) > max_rows) d <- d[seq_len(max_rows), , drop = FALSE]
+  if (ncol(d) == 0) return(NULL)
+  for (cn in names(d)) {
+    v <- d[[cn]]
+    if (is.numeric(v)) {
+      vv <- rep(NA_character_, length(v))
+      ok <- !is.na(v)
+      if (all(v[ok] == round(v[ok]))) {
+        vv[ok] <- formatC(v[ok], format = "d", big.mark = ",")
+      } else {
+        vv[ok] <- formatC(v[ok], format = "f", digits = 3)
+      }
+      v <- vv
+    } else {
+      v <- as.character(v)
+    }
+    long <- !is.na(v) & nchar(v) > max_chars
+    v[long] <- paste0(substr(v[long], 1, max_chars), "\u2026")
+    v[is.na(v)] <- "\u2014"
+    d[[cn]] <- v
+  }
+  d
+}
+
+# ---------------------------------------------------------------------------
+# REPORT CONTENT
+# One source of truth for the comparison report. Returns an ordered list of
+# blocks; each output format is only a renderer over this list, so the HTML and
+# Word versions cannot drift apart -- which matters, because this report is an
+# audit record and two formats of it must say the same thing.
+#
+# Block types: title | h1 | h2 | p | bullets | table
+# ---------------------------------------------------------------------------
+ab_report_blocks <- function(r, meta) {
+  B <- list()
+  add <- function(...) B[[length(B) + 1]] <<- list(...)
+
+  # Formatters that never print "NA" into a clinical report.
+  pc <- function(x, dg = 1) {
+    if (is.null(x) || length(x) == 0 || is.na(x)) return("not estimable")
+    sprintf(paste0("%.", dg, "f%%"), 100 * x)
+  }
+  nm <- function(x, dg = 3) {
+    if (is.null(x) || length(x) == 0 || is.na(x)) return("not estimable")
+    formatC(x, format = "f", digits = dg)
+  }
+  cm <- function(x) formatC(x, format = "d", big.mark = ",")
+
+  p_val <- r$mc$p_value
+  p_txt <- if (is.null(p_val) || is.na(p_val)) "not estimable" else
+    if (p_val < 0.001) "< 0.001" else formatC(p_val, format = "f", digits = 3)
+  mode_name <- switch(r$mode,
+    agree = "Agreement only (no ground truth supplied)",
+    ref_a = paste0("Relative \u2014 ", r$la, " nominated as reference"),
+    ref_b = paste0("Relative \u2014 ", r$lb, " nominated as reference"),
+    gold  = "Scored against a gold-standard column",
+    r$mode)
+
+  add(type = "title",
+      title = meta$title,
+      subtitle = sprintf("%s versus %s", r$la, r$lb),
+      stamp = format(Sys.time(), "%Y-%m-%d %H:%M:%S %Z"),
+      author = meta$prepared_by)
+
+  # ---- 1. Methods --------------------------------------------------------
+  add(type = "h1", text = "1. Methods")
+  add(type = "p", text = paste0(
+    "Two independent large-language-model extraction runs over the same set of clinical notes were ",
+    "compared at the note level. Both runs used the same prompt and the same structured output schema; ",
+    "they differ only in the model that produced the output. The comparison evaluates (a) how often the ",
+    "two models reach the same clinical call, and (b) whether each model's output is internally ",
+    "consistent and evidence-grounded."))
+  add(type = "h2", text = "1.1 Inputs and row matching")
+  add(type = "table", value = data.frame(
+    Item = c("Model A", "Model A file", "Model A rows in file", "Model A rows after de-duplication",
+             "Model B", "Model B file", "Model B rows in file", "Model B rows after de-duplication",
+             "Row matching key", "Rows matched",
+             "Rows only in A", "Rows only in B",
+             "Duplicate keys dropped (A)", "Duplicate keys dropped (B)",
+             "Share of rows discarded",
+             "Primary field (case definition)", "Values counted as positive",
+             "Detected diagnosis preset", "Scoring mode", "Gold-standard column"),
+    Value = c(r$la, meta$file_a, cm(r$n_a_raw %||% r$n_a), cm(r$n_a),
+              r$lb, meta$file_b, cm(r$n_b_raw %||% r$n_b), cm(r$n_b),
+              meta$key_desc, cm(r$n_matched),
+              cm(r$unmatched_a), cm(r$unmatched_b),
+              cm(r$dup_a), cm(r$dup_b),
+              pc(r$dup_frac %||% 0),
+              r$pf, paste(r$pos, collapse = ", "),
+              if (is.null(r$preset)) "not detected" else r$preset,
+              mode_name,
+              if (is.null(meta$gold_col)) "not used" else meta$gold_col),
+    stringsAsFactors = FALSE))
+  add(type = "p", text = paste0(
+    "A row contributes to the agreement statistics only when both models returned a usable value for the ",
+    "primary field. Rows where exactly one model returned no call are reported separately in Section 3.5 ",
+    "rather than being counted as agreement or disagreement, because a missing call is a different failure ",
+    "from a wrong call. Duplicate keys were reduced to their first occurrence and the number dropped is ",
+    "reported above."))
+
+  # A key at the wrong granularity silently discards most of the data, so the
+  # caveat belongs in Methods where it is read, not only in Limitations.
+  if (isTRUE((r$dup_frac %||% 0) >= 0.10)) {
+    add(type = "p", text = paste0(
+      "CAVEAT ON ROW MATCHING. ", pc(r$dup_frac), " of rows were discarded as duplicate keys, so every ",
+      "figure in this report describes the surviving subset rather than the full extraction. ",
+      if (isTRUE(r$key_is_coarse))
+        paste0("The matching key (", meta$key_desc, ") identifies a patient or an encounter rather than a ",
+               "single row. One NICU encounter contains many notes and many imaging studies, so all but ",
+               "the first were dropped and the comparison ran on one arbitrary row per encounter. ")
+      else
+        paste0("Every row after the first for each key value was dropped. "),
+      if (length(r$finer_keys %||% character(0)) > 0)
+        paste0("A finer identifier is present in both files (", paste(r$finer_keys, collapse = ", "),
+               "); re-running keyed on it would retain the discarded rows. ")
+      else
+        paste0("No finer identifier was found in both files. "),
+      "These results should not be interpreted until the matching key is resolved."))
+  }
+
+  # ---- 2. Statistical Analysis ------------------------------------------
+  add(type = "h1", text = "2. Statistical Analysis")
+  add(type = "h2", text = "2.1 Agreement")
+  add(type = "p", text = paste0(
+    "Raw agreement is the proportion of jointly scored rows on which the two models returned the same ",
+    "call. Raw agreement alone is misleading when a finding is uncommon: if a condition is present in 5% ",
+    "of notes, two models that both call almost everything negative will agree on roughly 95% of rows ",
+    "without either one being informative. Cohen's kappa is therefore reported alongside it. Kappa is the ",
+    "share of agreement remaining after the agreement expected from the two models' marginal rates is ",
+    "removed, so 0 means no better than chance and 1 means perfect. It is interpreted using the ",
+    "conventional Landis and Koch bands: below 0.20 slight, 0.20 to 0.40 fair, 0.40 to 0.60 moderate, ",
+    "0.60 to 0.80 substantial, above 0.80 almost perfect."))
+  add(type = "h2", text = "2.2 Testing for a systematic difference")
+  add(type = "p", text = paste0(
+    "Because both models scored the same notes, the two sets of calls are paired, and an unpaired test ",
+    "would be invalid. McNemar's test is used instead. It discards the rows on which the models agree, ",
+    "since those carry no information about a difference between them, and asks whether the remaining ",
+    "discordant rows split evenly between the two directions. An exact binomial test is used at every ",
+    "sample size rather than the chi-square approximation, so the p-value needs no large-sample ",
+    "justification at the small discordant counts typical of uncommon findings. A significant result ",
+    "means one model calls cases positive more readily than the other; it does not identify which model ",
+    "is correct."))
+  add(type = "h2", text = "2.3 Classification metrics")
+  add(type = "p", text = paste0(
+    "Where a reference was nominated, performance is summarised by positive predictive value (PPV, also ",
+    "called precision) and sensitivity (also called recall), in preference to a single global figure such ",
+    "as AUC. PPV answers the question a reviewer actually faces: of the notes this model flagged, what ",
+    "share were genuinely positive, and therefore how much of the review queue is wasted effort. ",
+    "Sensitivity answers the complementary question: of the true positives, what share would be missed ",
+    "if the model's output were used unreviewed. F1 is their harmonic mean. Each proportion carries a 95% ",
+    "Wilson score interval, which, unlike the normal approximation, remains inside the 0 to 1 range when ",
+    "counts are small or a proportion sits near 0 or 1."))
+  add(type = "h2", text = "2.4 Integrity checks (no ground truth required)")
+  add(type = "p", text = paste0(
+    "Three checks are computable from a single output file and need no reference standard. First, a quote ",
+    "is counted as hallucinated when the evidence span the model returned is not present verbatim in the ",
+    "source note, after normalising case, curly quotation marks and runs of whitespace so that cosmetic ",
+    "differences are not flagged. A model can reach the correct clinical conclusion while fabricating or ",
+    "paraphrasing the supporting quote, and that failure specifically defeats the audit trail the ",
+    "evidence-span design exists to provide. Second, a positive call accompanied by no quote at all is ",
+    "the same defect in a different form. Third, schema violations count cells whose value does not match ",
+    "the field type declared in the extraction schema, which indicates the model ignored the structured ",
+    "output contract."))
+
+  # ---- 3. Results -------------------------------------------------------
+  add(type = "h1", text = "3. Results")
+  add(type = "h2", text = "3.1 Summary")
+  add(type = "table", value = data.frame(
+    Metric = c("Rows matched", "Rows jointly scored", "Rows in agreement",
+               "Raw agreement", "Cohen's kappa", "Kappa interpretation",
+               "Discordant rows", paste0("Positive in ", r$la, " only"),
+               paste0("Positive in ", r$lb, " only"), "McNemar exact p",
+               paste0("Hallucinated quote rate \u2014 ", r$la),
+               paste0("Hallucinated quote rate \u2014 ", r$lb)),
+    Value = c(cm(r$n_matched), cm(r$n_both), cm(r$n_agree),
+              pc(r$pct_agree), nm(r$kappa), ab_kappa_label(r$kappa),
+              cm(r$mc$n_discordant), cm(r$mc$a_only), cm(r$mc$b_only), p_txt,
+              pc(r$hall_a, 2), pc(r$hall_b, 2)),
+    stringsAsFactors = FALSE))
+
+  if (!is.null(r$met_tbl)) {
+    add(type = "h2", text = "3.2 Classification metrics")
+    add(type = "p", text = if (identical(r$mode, "gold"))
+      "Scored against the nominated gold-standard column. These are accuracy estimates."
+      else paste0("Scored against a nominated model rather than a reference standard. ",
+                  "These quantify how the two models differ, not how accurate either one is."))
+    add(type = "table", value = ab_doc_prep_table(r$met_tbl))
+  }
+
+  add(type = "h2", text = "3.3 Per-field agreement")
+  add(type = "p", text = paste0(
+    "Compared fields, ordered worst agreement first. Fields are split by type, because the right question ",
+    "differs between them. For a categorical field (presence, grade, laterality, modality) the question is ",
+    "whether the two models returned the same value, so exact agreement and kappa are reported. For a ",
+    "continuous field such as a confidence score, exact agreement is close to meaningless, since two models ",
+    "almost never return the identical decimal; agreement and kappa are therefore left blank and the mean ",
+    "and maximum absolute difference and the correlation are reported instead. An integer field such as a ",
+    "grade or a gestational age counts as categorical, because matching exactly is genuinely what is being ",
+    "asked of it.",
+    if (!is.null(r$model_cols))
+      paste0(" The source column marks whether a field was produced by the model or carried through from ",
+             "the source query; passthrough fields are identical in both files by construction and agree ",
+             "trivially.")
+    else ""))
+  add(type = "table", value = ab_doc_prep_table(ab_drop_empty_cols(r$fld_tbl)),
+      empty = "No shared fields were compared.")
+
+  add(type = "h2", text = "3.4 Integrity audit")
+  aud_doc <- r$aud
+  if (!is.null(aud_doc) && nrow(aud_doc) > 0) {
+    aud_doc$rate_pct <- ifelse(is.na(aud_doc$rate), NA_real_, 100 * aud_doc$rate)
+    aud_doc <- aud_doc[, c("model", "metric", "count", "denom", "rate_pct", "detail"), drop = FALSE]
+    names(aud_doc) <- c("Model", "Check", "N", "Denominator", "Rate (%)", "Definition")
+  }
+  add(type = "table", value = ab_doc_prep_table(aud_doc, max_chars = 90),
+      empty = "Nothing to audit.")
+
+  add(type = "h2", text = "3.5 Disagreements")
+  n_dis <- if (is.null(r$dis)) 0 else nrow(r$dis)
+  add(type = "p", text = sprintf(
+    "%s row(s) disagree on the primary field or had a call from only one model. %s",
+    cm(n_dis),
+    if (n_dis > meta$max_dis)
+      sprintf("The first %s are listed below; the complete list is in the disagreements CSV export.", cm(meta$max_dis))
+    else "All are listed below."))
+  add(type = "table",
+      value = ab_doc_prep_table(r$dis, max_chars = 140,
+                                drop_cols = "NOTE_TEXT", max_rows = meta$max_dis),
+      empty = "No disagreements on the primary field.")
+  if (n_dis > 0)
+    add(type = "p", text = paste0(
+      "Note text is omitted from this table for length and is retained in the CSV export. This list is ",
+      "the adjudication worklist: these are the notes a clinical reviewer must read to establish which ",
+      "model is correct."))
+
+  # ---- 4. Discussion ----------------------------------------------------
+  add(type = "h1", text = "4. Discussion")
+  # Kappa can be genuinely undefined (only one observed level), and in that case
+  # "was not estimable, conventionally read as not estimable" is nonsense. The
+  # undefined case gets its own sentence, because an undefined kappa sitting
+  # beside 100% agreement is a substantive finding rather than a missing number.
+  if (is.null(r$kappa) || length(r$kappa) == 0 || is.na(r$kappa)) {
+    add(type = "p", text = sprintf(paste0(
+      "The two models returned the same call on %s of %s jointly scored notes (%s). Cohen's kappa could ",
+      "not be computed, because the primary field took only one value across the scored rows and a ",
+      "chance-corrected statistic needs variation to work on. That is itself the main finding rather ",
+      "than a gap in the analysis: agreement on a constant carries no information about which model ",
+      "detects the condition better, since a genuinely accurate model and a model that returns the same ",
+      "answer every time are indistinguishable on such data. A cohort containing confirmed positive ",
+      "cases is required before these two models can be ranked."),
+      cm(r$n_agree), cm(r$n_both), pc(r$pct_agree)))
+  } else {
+    add(type = "p", text = sprintf(paste0(
+      "The two models returned the same call on %s of %s jointly scored notes (%s). Chance-corrected ",
+      "agreement was %s, conventionally read as %s."),
+      cm(r$n_agree), cm(r$n_both), pc(r$pct_agree), nm(r$kappa), ab_kappa_label(r$kappa)))
+  }
+
+  if (isTRUE(r$mc$n_discordant == 0)) {
+    # "Split evenly within sampling error" is a strange thing to say about zero
+    # rows, and p = 1 here is arithmetic rather than evidence of anything.
+    add(type = "p", text = paste0(
+      "There were no discordant rows, so McNemar's test has nothing to work on and returns p = 1 by ",
+      "construction. This is a complete absence of evidence of a difference, which is not the same as ",
+      "evidence that the two models behave identically: a test with no discordant pairs has no power at all."))
+  } else if (!is.null(p_val) && !is.na(p_val) && p_val < 0.05) {
+    lead <- if (r$mc$a_only > r$mc$b_only) r$la else r$lb
+    add(type = "p", text = sprintf(paste0(
+      "The discordant rows did not split evenly (exact McNemar p = %s): %s called %s case(s) positive ",
+      "that %s did not, against %s in the opposite direction. %s therefore applies a systematically ",
+      "lower threshold for calling a case positive. Whether that reflects better sensitivity or more ",
+      "false positives cannot be settled from these two files, because neither is a reference standard; ",
+      "it requires chart review of the disagreement list."),
+      p_txt, r$la, cm(r$mc$a_only), r$lb, cm(r$mc$b_only), lead))
+  } else {
+    add(type = "p", text = sprintf(paste0(
+      "The discordant rows split evenly within sampling error (exact McNemar p = %s), so there is no ",
+      "evidence that either model systematically calls more cases positive than the other. With %s ",
+      "discordant row(s) the test may simply lack power to detect a modest difference, so this should ",
+      "not be read as evidence that the models are equivalent."),
+      p_txt, cm(r$mc$n_discordant)))
+  }
+
+  add(type = "p", text = paste0(
+    "On the integrity checks, the hallucinated-quote rate was ", pc(r$hall_a, 2), " for ", r$la,
+    " and ", pc(r$hall_b, 2), " for ", r$lb, ". ",
+    "This is the check that most directly bears on whether an extracted value can be audited, since a ",
+    "quote that is not in the note cannot be verified by a reviewer, and it is measurable without any ",
+    "reference standard."))
+
+  add(type = "h2", text = "4.1 Limitations")
+  lim <- c()
+  # Leads the list when present: it invalidates everything above it.
+  if (isTRUE((r$dup_frac %||% 0) >= 0.10)) {
+    lim <- c(lim, paste0(
+      pc(r$dup_frac), " of rows were discarded as duplicate keys when matching on ", meta$key_desc,
+      ", so this report describes a subset of the extraction rather than all of it. ",
+      if (isTRUE(r$key_is_coarse))
+        "The key identifies a patient or an encounter rather than a row, so the retained row for each key is arbitrary. "
+      else "",
+      "Resolve the matching key before drawing any conclusion from these figures."))
+  }
+  # Zero positives makes every detection metric vacuous, which is easy to miss
+  # behind a reassuring 100% agreement.
+  if (isTRUE(r$mc$a_only == 0) && isTRUE(r$mc$b_only == 0) &&
+      (is.null(r$kappa) || length(r$kappa) == 0 || is.na(r$kappa))) {
+    lim <- c(lim, paste0(
+      "Neither model returned a positive call on any scored row. Sensitivity and positive predictive ",
+      "value are undefined without positives, and the high raw agreement reflects two models concurring ",
+      "on a negative rather than either one demonstrating detection ability. This comparison cannot rank ",
+      "the models until it is run on a cohort known to contain positive cases."))
+  }
+  if (r$mode %in% c("agree", "ref_a", "ref_b")) {
+    lim <- c(lim, paste0(
+      "No reference standard was supplied, so nothing in this report establishes accuracy. Agreement ",
+      "between two models is not evidence that either is correct: models that share a blind spot agree ",
+      "perfectly. Any accuracy claim requires scoring against expert chart review."))
+  }
+  if (r$mode %in% c("ref_a", "ref_b")) {
+    lim <- c(lim, paste0(
+      "The PPV and sensitivity figures in Section 3.2 are computed against a nominated model, not a ",
+      "validated standard, and should be described as relative agreement rather than accuracy."))
+  }
+  if (identical(r$mode, "gold")) {
+    lim <- c(lim, paste0(
+      "Accuracy estimates cover only the rows where the gold-standard column is populated, which may not ",
+      "be a random sample of the cohort. If the reviewed rows were selected because they were difficult ",
+      "or because a model flagged them, the resulting PPV and sensitivity will not transfer to the full ",
+      "cohort."))
+  }
+  lim <- c(lim,
+    paste0("Results reflect a single run of each model. Generation is not fully deterministic, so part of ",
+           "the observed disagreement is run-to-run variation rather than a stable difference between ",
+           "models. Repeat runs would be needed to separate the two."),
+    paste0("The unit of analysis is the note, not the infant. A patient with several cranial studies ",
+           "contributes several rows, so these figures do not describe accuracy of a patient-level ",
+           "diagnosis, which depends additionally on how per-note results are rolled up (for example a ",
+           "worst-grade-ever rule)."),
+    paste0("Kappa is sensitive to how common the finding is. For a rare condition it can be low even when ",
+           "raw agreement is high, and it is not comparable across cohorts with different prevalence."),
+    paste0("Rows present in only one file are excluded from the agreement statistics and are counted in ",
+           "Section 1.1. A large imbalance there indicates the two runs did not cover the same notes, ",
+           "which would need resolving before these figures are interpreted."))
+  add(type = "bullets", items = lim)
+
+  add(type = "h2", text = "4.2 Suggested next step")
+  add(type = "p", text = paste0(
+    "Chart-review the rows in Section 3.5 and record the adjudicated call in a gold-standard column, then ",
+    "re-run this comparison in gold-standard mode. Reviewing only the discordant rows is substantially ",
+    "cheaper than reviewing the full cohort and is sufficient to rank the two models, though a sample of ",
+    "concordant rows is also needed to detect errors the two models share."))
+
+  # ---- Appendix ---------------------------------------------------------
+  add(type = "h1", text = "Appendix. Reproducibility")
+  add(type = "table", value = data.frame(
+    Item = c("Report generated", "Model A label", "Model A source file",
+             "Model B label", "Model B source file", "Row matching",
+             "Primary field", "Positive value definition", "Scoring mode",
+             "Hallucination rule", "Agreement test", "Interval method"),
+    Value = c(format(Sys.time(), "%Y-%m-%d %H:%M:%S %Z"), r$la, meta$file_a,
+              r$lb, meta$file_b, meta$key_desc, r$pf,
+              paste(r$pos, collapse = " | "), mode_name,
+              "evidence span absent from NOTE_TEXT after case/quote/whitespace normalisation",
+              "exact McNemar (binomial, paired)", "Wilson score, 95%"),
+    stringsAsFactors = FALSE))
+
+  B
+}
+
+# ---------------------------------------------------------------------------
+# RENDERER: self-contained HTML  (the recommended format)
+# No package dependencies, no external assets, no network fetch. Opens on any
+# machine and prints to PDF from the browser, which avoids needing a LaTeX
+# toolchain just to produce a fixed-layout copy.
+# ---------------------------------------------------------------------------
+
+# Escape order matters: & must be replaced first or later entities get mangled.
+ab_html_escape <- function(x) {
+  x <- as.character(x)
+  x[is.na(x)] <- ""
+  x <- gsub("&", "&amp;", x, fixed = TRUE)
+  x <- gsub("<", "&lt;", x, fixed = TRUE)
+  x <- gsub(">", "&gt;", x, fixed = TRUE)
+  x <- gsub("\"", "&quot;", x, fixed = TRUE)
+  x
+}
+
+ab_html_table <- function(df) {
+  if (is.null(df) || nrow(df) == 0) return("")
+  hd <- paste0("<th>", ab_html_escape(names(df)), "</th>", collapse = "")
+  rows <- vapply(seq_len(nrow(df)), function(i) {
+    cells <- vapply(names(df), function(cn) {
+      paste0("<td>", ab_html_escape(df[[cn]][i]), "</td>")
+    }, character(1))
+    paste0("<tr>", paste(cells, collapse = ""), "</tr>")
+  }, character(1))
+  paste0("<div class='tw'><table><thead><tr>", hd, "</tr></thead><tbody>",
+         paste(rows, collapse = ""), "</tbody></table></div>")
+}
+
+AB_HTML_CSS <- "
+:root{--navy:#13294b;--navy2:#1f4068;--teal:#008c95;--ink:#1c1c1c;
+      --muted:#5a6672;--line:#d6dce3;--bg:#ffffff;--zebra:#f6f8fa;}
+*{box-sizing:border-box;}
+body{margin:0;padding:48px 56px 72px;background:var(--bg);color:var(--ink);
+  font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;
+  font-size:11.5pt;line-height:1.65;max-width:1100px;}
+h1{color:var(--navy);font-size:17pt;font-weight:650;letter-spacing:-0.01em;
+  margin:34px 0 12px;padding-bottom:7px;border-bottom:2px solid var(--teal);}
+h2{color:var(--navy2);font-size:12.5pt;font-weight:600;margin:24px 0 8px;}
+p{margin:0 0 12px;text-align:justify;}
+ul{margin:0 0 14px;padding-left:22px;}
+li{margin-bottom:9px;}
+table{border-collapse:collapse;width:100%;margin:10px 0 20px;font-size:9.8pt;}
+thead th{background:var(--navy);color:#fff;text-align:left;font-weight:600;
+  padding:7px 10px;border:1px solid var(--navy);}
+tbody td{padding:6px 10px;border:1px solid var(--line);vertical-align:top;
+  overflow-wrap:break-word;}
+tbody tr:nth-child(even){background:var(--zebra);}
+tbody tr td:first-child{font-weight:500;}
+.cover{border-bottom:3px solid var(--navy);padding-bottom:18px;margin-bottom:8px;}
+.cover h1{border:none;margin:0 0 6px;padding:0;font-size:22pt;}
+.sub{color:var(--teal);font-size:13pt;font-weight:600;margin-bottom:10px;
+  font-variant-numeric:tabular-nums;}
+.meta{color:var(--muted);font-size:9.5pt;line-height:1.5;}
+.none{color:var(--muted);font-style:italic;margin:0 0 16px;}
+.hint{background:#f0f6f7;border-left:3px solid var(--teal);padding:10px 14px;
+  margin:0 0 22px;font-size:9.5pt;color:var(--muted);}
+/* A wide table scrolls inside its own box on a narrow screen rather than
+   forcing the whole page sideways. Reset for print so nothing is clipped. */
+.tw{overflow-x:auto;-webkit-overflow-scrolling:touch;margin:10px 0 20px;}
+.tw table{margin:0;}
+@media (max-width:640px){
+  body{padding:24px 16px 48px;font-size:11pt;}
+  .cover h1{font-size:18pt;}
+  table{font-size:9pt;}
+  p{text-align:left;}
+}
+@media print{
+  body{padding:0;font-size:10pt;max-width:none;
+    -webkit-print-color-adjust:exact;print-color-adjust:exact;}
+  .hint{display:none;}
+  .tw{overflow:visible;}
+  h1{page-break-after:avoid;}
+  h2{page-break-after:avoid;}
+  table{page-break-inside:auto;}
+  tr{page-break-inside:avoid;}
+  thead{display:table-header-group;}
+}
+"
+
+ab_build_html <- function(r, meta, file) {
+  blocks <- ab_report_blocks(r, meta)
+  out <- character(0)
+  push <- function(s) out[[length(out) + 1]] <<- s
+  ttl <- meta$title
+
+  for (b in blocks) {
+    if (identical(b$type, "title")) {
+      ttl <- b$title
+      push(paste0(
+        "<div class='cover'><h1>", ab_html_escape(b$title), "</h1>",
+        "<div class='sub'>", ab_html_escape(b$subtitle), "</div>",
+        "<div class='meta'>Generated ", ab_html_escape(b$stamp),
+        if (!is.null(b$author) && nzchar(b$author))
+          paste0("<br>Prepared by: ", ab_html_escape(b$author)) else "",
+        "</div></div>"))
+      push(paste0("<div class='hint'>To save a fixed-layout copy, print this page ",
+                  "and choose &quot;Save as PDF&quot;. This block is hidden when printed.</div>"))
+    } else if (identical(b$type, "h1")) {
+      push(paste0("<h1>", ab_html_escape(b$text), "</h1>"))
+    } else if (identical(b$type, "h2")) {
+      push(paste0("<h2>", ab_html_escape(b$text), "</h2>"))
+    } else if (identical(b$type, "p")) {
+      push(paste0("<p>", ab_html_escape(b$text), "</p>"))
+    } else if (identical(b$type, "bullets")) {
+      push(paste0("<ul>", paste0("<li>", ab_html_escape(b$items), "</li>",
+                                 collapse = ""), "</ul>"))
+    } else if (identical(b$type, "table")) {
+      if (is.null(b$value) || nrow(b$value) == 0) {
+        push(paste0("<p class='none'>",
+                    ab_html_escape(if (is.null(b$empty)) "None." else b$empty), "</p>"))
+      } else {
+        push(ab_html_table(b$value))
+      }
+    }
+  }
+
+  html <- paste0(
+    "<!doctype html>\n<html lang='en'><head><meta charset='utf-8'>",
+    "<meta name='viewport' content='width=device-width,initial-scale=1'>",
+    "<title>", ab_html_escape(ttl), "</title><style>", AB_HTML_CSS, "</style>",
+    "</head><body>\n", paste(out, collapse = "\n"), "\n</body></html>\n")
+
+  con <- file(file, open = "wb")
+  on.exit(close(con), add = TRUE)
+  writeLines(enc2utf8(html), con, useBytes = TRUE)
+  invisible(file)
+}
+
+# ---------------------------------------------------------------------------
+# RENDERER: Word (.docx) -- for co-authors who track-change, and for pasting
+# tables into a manuscript. Requires the officer package.
+# ---------------------------------------------------------------------------
+
+# Apply the first style the template actually accepts, falling back to the
+# template default. Style names differ between Word templates, so nothing here
+# depends on a particular one being present.
+ab_try_styles <- function(fn, d, value, styles) {
+  for (s in styles) {
+    out <- tryCatch(fn(d, value, style = s), error = function(e) NULL)
+    if (!is.null(out)) return(out)
+  }
+  tryCatch(fn(d, value), error = function(e) d)
+}
+
+ab_build_docx <- function(r, meta, file) {
+  if (!requireNamespace("officer", quietly = TRUE))
+    stop("The 'officer' package is required for Word export. Install it with: install.packages(\"officer\")")
+
+  blocks <- ab_report_blocks(r, meta)
+  doc <- officer::read_docx()
+  h1 <- c("heading 1", "Heading 1", "Title")
+  h2 <- c("heading 2", "Heading 2", "Subtitle")
+  tb <- c("table_template", "Table Grid", "Plain Table 1", "Normal Table")
+
+  P <- function(d, txt, styles = NULL) {
+    if (is.null(styles)) return(officer::body_add_par(d, txt))
+    ab_try_styles(officer::body_add_par, d, txt, styles)
+  }
+
+  for (b in blocks) {
+    if (identical(b$type, "title")) {
+      doc <- P(doc, b$title, h1)
+      doc <- P(doc, b$subtitle)
+      doc <- P(doc, paste0("Generated ", b$stamp))
+      if (!is.null(b$author) && nzchar(b$author))
+        doc <- P(doc, paste0("Prepared by: ", b$author))
+      doc <- P(doc, "")
+    } else if (identical(b$type, "h1")) {
+      doc <- P(doc, b$text, h1)
+    } else if (identical(b$type, "h2")) {
+      doc <- P(doc, b$text, h2)
+    } else if (identical(b$type, "p")) {
+      doc <- P(doc, b$text)
+    } else if (identical(b$type, "bullets")) {
+      for (it in b$items) doc <- P(doc, paste0("\u2022  ", it))
+    } else if (identical(b$type, "table")) {
+      if (is.null(b$value) || nrow(b$value) == 0) {
+        doc <- P(doc, if (is.null(b$empty)) "None." else b$empty)
+      } else {
+        doc <- ab_try_styles(officer::body_add_table, doc, b$value, tb)
+        doc <- P(doc, "")
+      }
+    }
+  }
+
+  print(doc, target = file)
+  invisible(file)
+}
+
+ab_read_file <- function(path, name, sheet = NULL) {
+  ext <- tolower(tools::file_ext(name))
+  if (ext %in% c("xlsx", "xls")) {
+    if (is.null(sheet) || !nzchar(sheet)) return(readxl::read_excel(path))
+    return(readxl::read_excel(path, sheet = sheet))
+  }
+  if (ext == "csv") return(readr::read_csv(path, show_col_types = FALSE))
+  if (ext == "txt") return(readr::read_delim(path, delim = "\t", show_col_types = FALSE))
+  stop(paste("Unsupported file type:", ext))
+}
+
+# Columns that make sense as a row key, MOST GRANULAR FIRST -- the first match
+# is auto-selected, so ordering decides what a user gets by default.
+#
+# This ordering is load-bearing. An encounter- or patient-level ID looks like a
+# perfectly good key until you notice that one NICU encounter has many cranial
+# studies: every study after the first is then discarded as a duplicate, and the
+# comparison silently runs on one arbitrary study per infant. Row-level
+# identifiers (the note, the imaging order, the accession) must therefore be
+# preferred over PAT_ENC_CSN_ID / PAT_ID / MRN, which appear last and are
+# flagged as coarse below.
+AB_KEY_CANDIDATES <- c(
+  # note level
+  "NOTE_ID", "NOTE_CSN_ID", "NOTE_CSN",
+  # imaging order / study level
+  "ORDER_PROC_ID", "ORDER_ID", "PROC_ORD_ID", "ORDER_PROC_CSN_ID",
+  "ACCESSION_NUM", "ACCESSION_NUMBER", "ACCESSION",
+  # procedure / case level
+  "OR_CASE_ID", "LOG_ID",
+  # line within a result
+  "LINE_NUM", "LINE",
+  # encounter level -- one per hospital stay, NOT per study
+  "PAT_ENC_CSN_ID", "PAT_ENC_CSN", "HSP_ACCOUNT_ID",
+  # patient level -- coarsest of all
+  "PAT_ID", "MRN",
+  "row_id")
+
+# Keys that identify a patient or an encounter rather than a row. Selecting one
+# is legitimate when the files really are one row per patient, so it is allowed,
+# but it triggers the duplicate-key warning when it collapses rows.
+AB_COARSE_KEYS <- c("PAT_ENC_CSN_ID", "PAT_ENC_CSN", "HSP_ACCOUNT_ID", "PAT_ID", "MRN")
+
+# Columns that are inputs or bookkeeping, not model output, so they are not
+# offered as things to compare.
+AB_NON_COMPARE <- c("NOTE_TEXT", "NOTE_DATE", "CONTACT_DATE", "extract_error",
+                    "raw_response", "prompt_used")
 
 # =============================================================================
 # REVIEW STATUS  (honors negation; gates inclusion on confidence threshold)
@@ -1477,12 +2572,12 @@ ui <- fluidPage(
       });
     "))
   ),
-  
+
   div(class = "app-header",
       h2("\U0001f52c Clinical NLP Notes Pipeline"),
       div(class = "subtitle", uiOutput("header_subtitle"))
   ),
-  
+
   div(class = "status-bar",
       div(class = "status-item",
           span(class = "status-item-label", "Diagnosis"),
@@ -1505,7 +2600,7 @@ ui <- fluidPage(
                   style = "width:0%", `aria-valuenow` = "0",
                   `aria-valuemin` = "0", `aria-valuemax` = "100")))
   ),
-  
+
   navset_card_tab(
     nav_panel(
       "Pipeline",
@@ -1658,7 +2753,10 @@ ui <- fluidPage(
                      div(textInput("ai_project", "GCP Project", value = DEFAULT_VERTEX_CONFIG$project),
                          fluidRow(
                            column(6, textInput("ai_location", "Location", value = DEFAULT_VERTEX_CONFIG$location)),
-                           column(6, textInput("ai_model_vertex", "Model", value = DEFAULT_VERTEX_CONFIG$model))
+                           column(6, selectizeInput("ai_model_vertex", "Model",
+                                                 choices = gemini_model_choices(),
+                                                 selected = DEFAULT_VERTEX_CONFIG$model,
+                                                 options = list(create = TRUE)))
                          ))
                    ),
                    conditionalPanel(
@@ -1678,6 +2776,131 @@ ui <- fluidPage(
                    )
                )
         )
+      )
+    ),
+    nav_panel(
+      "Usage & Cost",
+      div(class = "section-card",
+          div(class = "section-title", "Tokens, Duration & Estimated Cost"),
+          uiOutput("usage_summary_ui"),
+          hr(class = "divider-line"),
+          div(class = "form-label", "Pricing (per 1,000,000 tokens, USD) \u2014 auto-filled from the Model selected in Config"),
+          fluidRow(
+            column(6, numericInput("cost_per_1m_input", "Input token price ($/1M)",
+                                   value = model_pricing(DEFAULT_VERTEX_CONFIG$model)$price_in %||% 0,
+                                   min = 0, step = 0.01)),
+            column(6, numericInput("cost_per_1m_output", "Output token price ($/1M)",
+                                   value = model_pricing(DEFAULT_VERTEX_CONFIG$model)$price_out %||% 0,
+                                   min = 0, step = 0.01))
+          ),
+          uiOutput("model_price_note"),
+          div(style = "font-size:0.72rem;color:#8b949e;",
+              "Rates are standard-tier list prices checked Oct 2026; reasoning (\u201cthinking\u201d) tokens are billed as output and are included in Output Tokens. You can overwrite either field. LM Studio runs are local and always shown as $0.00."),
+          hr(class = "divider-line"),
+          actionButton("btn_reset_usage", "Reset counters",
+                       class = "btn btn-sm btn-outline-secondary",
+                       style = "font-family:'IBM Plex Mono';font-size:0.7rem;")
+      )
+    ),
+    nav_panel(
+      "Model A/B",
+      div(class = "section-card",
+          div(class = "section-title", "Load the two runs"),
+          div(style = "font-size:0.75rem;color:#8b949e;margin-bottom:10px;",
+              "Two exports of the SAME notes, scored by two different models. CSV or XLSX."),
+          fluidRow(
+            column(6,
+                   div(class = "form-label", "Model A \u2014 file"),
+                   fileInput("ab_file_a", label = NULL,
+                             accept = c(".csv", ".xlsx", ".xls", ".txt"),
+                             buttonLabel = "Browse", placeholder = "No file"),
+                   uiOutput("ab_sheet_a_ui"),
+                   textInput("ab_label_a", "Label for A", value = "Gemini 2.5 Flash")
+            ),
+            column(6,
+                   div(class = "form-label", "Model B \u2014 file"),
+                   fileInput("ab_file_b", label = NULL,
+                             accept = c(".csv", ".xlsx", ".xls", ".txt"),
+                             buttonLabel = "Browse", placeholder = "No file"),
+                   uiOutput("ab_sheet_b_ui"),
+                   textInput("ab_label_b", "Label for B", value = "LM Studio (local)")
+            )
+          ),
+          uiOutput("ab_load_status")
+      ),
+
+      div(class = "section-card",
+          div(class = "section-title", "Comparison settings"),
+          fluidRow(
+            column(4,
+                   div(class = "form-label", "Match rows on"),
+                   selectInput("ab_join_key", label = NULL, choices = character(0),
+                               multiple = TRUE, width = "100%")),
+            column(4,
+                   div(class = "form-label", "Primary field (the yes/no call)"),
+                   selectInput("ab_primary_field", label = NULL,
+                               choices = character(0), width = "100%")),
+            column(4,
+                   div(class = "form-label", "Values that count as POSITIVE"),
+                   textInput("ab_pos_vals", label = NULL, value = "true,yes,1",
+                             width = "100%"))
+          ),
+          hr(class = "divider-line"),
+          div(class = "form-label", "Scoring mode"),
+          radioButtons("ab_mode", label = NULL,
+                       choices = c(
+                         "Agreement only \u2014 no ground truth" = "agree",
+                         "Treat Model A as the reference" = "ref_a",
+                         "Treat Model B as the reference" = "ref_b",
+                         "Score both against a gold-standard column" = "gold"),
+                       selected = "agree"),
+          div(style = "font-size:0.72rem;color:#d29922;margin:-4px 0 8px 0;",
+              "\u26A0 Precision, recall and F1 need a ground truth. With two model outputs and nothing else, ",
+              "you are measuring AGREEMENT \u2014 if both models share a blind spot they agree perfectly and every ",
+              "score looks excellent. Use a reference mode only to describe how B differs from A, and use gold ",
+              "mode (a chart-reviewed column) for anything you intend to report as accuracy."),
+          uiOutput("ab_gold_ui"),
+          hr(class = "divider-line"),
+          div(class = "form-label", "Other fields to compare (grade, laterality, confidence, ...)"),
+          selectizeInput("ab_compare_fields", label = NULL, choices = character(0),
+                         multiple = TRUE, width = "100%",
+                         options = list(plugins = list("remove_button"))),
+          hr(class = "divider-line"),
+          actionButton("ab_run", "Run comparison", class = "btn btn-primary",
+                       style = "font-family:'IBM Plex Mono';font-size:0.75rem;")
+      ),
+
+      uiOutput("ab_results_ui"),
+
+      div(class = "section-card",
+          div(class = "section-title", "Full report"),
+          div(style = "font-size:0.75rem;color:#8b949e;margin-bottom:10px;",
+              "Methods, Statistical Analysis, Results, Discussion and a reproducibility appendix. Both formats render from the same content, so they always say the same thing."),
+          fluidRow(
+            column(5, textInput("ab_rep_title", "Report title",
+                                value = "NICU LLM Extraction: Model Comparison Report",
+                                width = "100%")),
+            column(4, textInput("ab_rep_author", "Prepared by (optional)",
+                                value = "", width = "100%")),
+            column(3, numericInput("ab_rep_maxdis", "Max disagreement rows in the report",
+                                   value = 50, min = 0, step = 10, width = "100%"))
+          ),
+          uiOutput("ab_report_status"),
+          div(style = "display:flex;flex-wrap:wrap;gap:10px;align-items:center;",
+              downloadButton("ab_dl_html", "Download report (.html)",
+                             class = "btn btn-primary",
+                             style = "font-family:'IBM Plex Mono';font-size:0.75rem;"),
+              downloadButton("ab_dl_docx", "Download report (.docx)",
+                             class = "btn btn-outline-secondary",
+                             style = "font-family:'IBM Plex Mono';font-size:0.75rem;")),
+          div(style = "font-size:0.72rem;color:#8b949e;margin-top:10px;line-height:1.6;",
+              tags$b("HTML"), " needs no extra R packages, opens on any machine without Word, and prints ",
+              "to PDF straight from the browser, so there is no LaTeX toolchain to install. It is one file ",
+              "with nothing linked externally, which is what an archived audit record wants.",
+              tags$br(),
+              tags$b("Word"), " is for co-authors who track-change and for pasting tables into a ",
+              "manuscript. It needs the officer package."),
+          uiOutput("ab_docx_note")
       )
     ),
     nav_panel(
@@ -1708,7 +2931,7 @@ ui <- fluidPage(
 # =============================================================================
 
 server <- function(input, output, session) {
-  
+
   rv <- reactiveValues(
     gcp_ok = NULL, gcp_token = NULL, gcp_msg = "",
     lm_ok = NULL, lm_msg = "", lm_models = character(0),
@@ -1718,14 +2941,23 @@ server <- function(input, output, session) {
     processing = FALSE, stop_flag = FALSE,
     progress_i = 0, progress_n = 0, start_time = NULL,
     selected_row = NULL,
-    n_failed = 0
+    n_failed = 0,
+    # Token usage / cost / duration — reset at the start of each run,
+    # accumulated across every API call (including retries) in that run.
+    total_input_tokens = 0, total_output_tokens = 0, total_api_calls = 0,
+    total_thought_tokens = 0,
+    run_elapsed_secs = 0, run_finished = FALSE, run_model = NULL
   )
-  
+
   log_add <- function(...) {
     msg <- paste0("[", format(Sys.time(), "%H:%M:%S"), "]  ", paste(...))
     rv$log_lines <- c(rv$log_lines, msg)
   }
-  
+
+  # NA-safe numeric coalesce — a token count missing from an API response
+  # should add 0, not poison the running total with NA.
+  num0 <- function(x) if (is.null(x) || length(x) == 0 || is.na(x)) 0 else as.numeric(x)
+
   build_db_cfg <- function() {
     list(server = input$db_server, port = input$db_port, database = input$db_name,
          auth_type = input$db_auth_type, username = input$db_username, password = input$db_password)
@@ -1736,13 +2968,13 @@ server <- function(input, output, session) {
   build_lm_cfg <- function() {
     list(base_url = input$lm_base_url, model = input$lm_model_input)
   }
-  
+
   update_progress_bar <- function(i, n) {
     pct <- if (n > 0) round(100 * i / n) else 0
     session$sendCustomMessage("update-progress", list(pct = pct))
   }
   observe({ update_progress_bar(rv$progress_i, rv$progress_n) })
-  
+
   # ── Diagnosis preset switching ──
   observeEvent(input$diagnosis_preset, {
     key <- input$diagnosis_preset
@@ -1755,7 +2987,7 @@ server <- function(input, output, session) {
       updateTextInput(session, "output_filename", value = paste0(tolower(key), "_nlp_extraction"))
     log_add(sprintf("Preset switched to: %s", preset$label))
   }, ignoreInit = TRUE)
-  
+
   output$schema_fields_ui <- renderUI({
     key <- if (!is.null(input$diagnosis_preset)) input$diagnosis_preset else "NEC"
     preset <- DIAGNOSIS_PRESETS[[key]]
@@ -1763,25 +2995,25 @@ server <- function(input, output, session) {
     field_pills <- lapply(preset$col_labels, function(lbl) span(class = "schema-field", lbl))
     div(class = "schema-fields", tagList(field_pills))
   })
-  
+
   output$header_subtitle <- renderUI({
     provider_label <- if (!is.null(input$llm_provider) && input$llm_provider == "vertex")
       "Clarity EHR \u00b7 Vertex AI / Gemini" else "Clarity EHR \u00b7 LM Studio (Local)"
     span(provider_label)
   })
-  
+
   output$llm_status_label <- renderUI({
     if (!is.null(input$llm_provider) && input$llm_provider == "vertex")
       "GCP Authentication" else "LM Studio Connection"
   })
-  
+
   output$llm_status_icon <- renderUI({
     ok <- if (!is.null(input$llm_provider) && input$llm_provider == "vertex") rv$gcp_ok else rv$lm_ok
     if (is.null(ok)) span("\u25cb", class = "status-pending")
     else if (ok)     span("\u2713", class = "status-ok")
     else             span("\u2717", class = "status-fail")
   })
-  
+
   output$llm_status_text <- renderUI({
     if (!is.null(input$llm_provider) && input$llm_provider == "vertex") {
       if (is.null(rv$gcp_ok)) span("Not checked", class = "pill-tag pill-pending")
@@ -1796,7 +3028,7 @@ server <- function(input, output, session) {
       } else span(rv$lm_msg, class = "pill-tag pill-danger")
     }
   })
-  
+
   observeEvent(input$btn_check_llm, {
     if (!is.null(input$llm_provider) && input$llm_provider == "vertex") {
       log_add("Checking GCP authentication...")
@@ -1816,7 +3048,7 @@ server <- function(input, output, session) {
       } else log_add("\u2717 LM Studio failed:", result$msg)
     }
   })
-  
+
   observeEvent(input$btn_fetch_models, {
     log_add("Fetching models from LM Studio...")
     result <- check_lmstudio(input$lm_base_url)
@@ -1829,7 +3061,7 @@ server <- function(input, output, session) {
     } else if (result$ok) log_add("\u2713 Connected but no models loaded")
     else log_add("\u2717 Failed:", result$msg)
   })
-  
+
   output$lm_model_list_ui <- renderUI({
     models <- rv$lm_models
     if (length(models) == 0) return(NULL)
@@ -1841,12 +3073,12 @@ server <- function(input, output, session) {
       div(class = "form-label", style = "margin-top:10px;", "Available Models (click to select)"),
       div(class = "model-list-box", tagList(items)))
   })
-  
+
   observeEvent(input$lm_model_click, {
     updateTextInput(session, "lm_model_input", value = input$lm_model_click)
     log_add("Model set to:", input$lm_model_click)
   })
-  
+
   observeEvent(input$btn_test_db, {
     log_add("Testing database connection...")
     cfg <- build_db_cfg()
@@ -1859,7 +3091,7 @@ server <- function(input, output, session) {
       log_add("\u2713 DB connection OK"); DBI::dbDisconnect(conn)
     }
   })
-  
+
   output$db_icon <- renderUI({
     if (is.null(rv$db_ok)) span("\u25cb", class = "status-pending")
     else if (rv$db_ok)     span("\u2713", class = "status-ok")
@@ -1870,7 +3102,7 @@ server <- function(input, output, session) {
     else if (rv$db_ok)     span("Connected", class = "pill-tag pill-success")
     else                   span("Failed", class = "pill-tag pill-danger")
   })
-  
+
   # ── Persistent status bar ──
   output$status_diag_badge <- renderUI({
     key <- if (!is.null(input$diagnosis_preset)) input$diagnosis_preset else "NEC"
@@ -1878,20 +3110,20 @@ server <- function(input, output, session) {
     if (is.null(preset)) preset <- DIAGNOSIS_PRESETS[["NEC"]]
     span(preset$label, class = paste0("pill-tag diag-", key))
   })
-  
+
   output$status_provider <- renderUI({
     if (!is.null(input$llm_provider) && input$llm_provider == "vertex")
       span("Vertex AI", class = "pill-tag pill-info")
     else
       span("LM Studio (Local)", class = "pill-tag pill-pending")
   })
-  
+
   output$status_db_dot <- renderUI({
     if (is.null(rv$db_ok)) span("\u25cb Not checked", class = "status-dot status-pending")
     else if (rv$db_ok)     span("\u25cf Connected", class = "status-dot status-ok")
     else                   span("\u25cf Failed", class = "status-dot status-fail")
   })
-  
+
   # Failure counter — makes silent NA impossible to miss.
   output$status_failures <- renderUI({
     if (is.null(rv$notes_data)) return(span("\u2014", class = "pill-tag pill-pending"))
@@ -1906,7 +3138,7 @@ server <- function(input, output, session) {
       span(sprintf("%d failed%s", n_fail, if (n_na > 0) sprintf(" \u00b7 %d unprocessed", n_na) else ""),
            class = "pill-tag pill-danger")
   })
-  
+
   output$file_upload_status <- renderUI({
     req(input$upload_file)
     ext <- tolower(tools::file_ext(input$upload_file$name))
@@ -1914,7 +3146,7 @@ server <- function(input, output, session) {
     span(paste(icon, input$upload_file$name), class = "pill-tag pill-success",
          style = "font-size:0.75rem;margin-top:6px;display:inline-block;")
   })
-  
+
   xlsx_sheets <- reactive({
     req(input$upload_file)
     ext <- tolower(tools::file_ext(input$upload_file$name))
@@ -1922,12 +3154,12 @@ server <- function(input, output, session) {
   })
   output$show_sheet_selector <- reactive({ !is.null(xlsx_sheets()) })
   outputOptions(output, "show_sheet_selector", suspendWhenHidden = FALSE)
-  
+
   output$sheet_selector_ui <- renderUI({
     sheets <- xlsx_sheets(); req(sheets)
     selectInput("xlsx_sheet", "Sheet", choices = sheets, selected = sheets[1])
   })
-  
+
   uploaded_data <- reactive({
     req(input$upload_file)
     ext <- tolower(tools::file_ext(input$upload_file$name))
@@ -1939,20 +3171,20 @@ server <- function(input, output, session) {
       } else load_uploaded_file(path, name)
     }, error = function(e) { log_add("\u2717 File load error:", e$message); NULL })
   })
-  
+
   output$log_output <- renderText({ paste(tail(rv$log_lines, 200), collapse = "\n") })
-  
+
   observeEvent(input$btn_clear_log, {
     rv$log_lines <- character(0)
   })
-  
+
   output$progress_label <- renderUI({
     if (rv$progress_n == 0) return(div(style = "font-size:0.72rem;color:#8b949e;", "Idle"))
     pct <- round(100 * rv$progress_i / rv$progress_n)
     div(style = "font-size:0.72rem;color:#8b949e;",
         sprintf("Row %d / %d  (%d%%)", rv$progress_i, rv$progress_n, pct))
   })
-  
+
   output$eta_label <- renderUI({
     if (is.null(rv$start_time) || rv$progress_i == 0 || rv$progress_n == 0) return(NULL)
     elapsed <- as.numeric(difftime(Sys.time(), rv$start_time, units = "secs"))
@@ -1960,59 +3192,59 @@ server <- function(input, output, session) {
     remaining <- (rv$progress_n - rv$progress_i) / max(rate, 0.001)
     span(sprintf("ETA ~%dm %ds", floor(remaining / 60), round(remaining %% 60)))
   })
-  
+
   observeEvent(input$btn_stop, {
     rv$stop_flag <- TRUE; log_add("\u23f9 Stop requested.")
   })
-  
+
   resolved_output_path <- reactive({
     fname <- trimws(input$output_filename); dname <- trimws(input$output_dir)
     if (fname == "") fname <- "notes_llm_processed"
     fname <- gsub("\\.csv$", "", fname, ignore.case = TRUE)
-    fname <- gsub("[^A-Za-z0-9_\\-]", "_", fname)
+    fname <- gsub("[^A-Za-z0-9_-]", "_", fname)
     list(dir = dname, base = fname,
          final = file.path(dname, paste0(fname, ".csv")),
          autosave = file.path(dname, paste0(fname, "_AUTOSAVE.csv")))
   })
-  
+
   output$output_dir_status <- renderUI({
     d <- trimws(input$output_dir); if (d == "") return(NULL)
     if (!dir.exists(d)) span("\u2717", title = "Does not exist", class = "status-fail", style = "font-size:1rem;")
     else if (file.access(d, 2) != 0) span("\u26a0", title = "Not writable", class = "status-fail", style = "font-size:1rem;")
     else span("\u2713", title = "OK", class = "status-ok", style = "font-size:1rem;")
   })
-  
+
   output$output_path_preview <- renderUI({
     p <- resolved_output_path()
     div(style = "font-family:'IBM Plex Mono',monospace;font-size:0.7rem;color:#8b949e;margin-bottom:4px;",
         sprintf("\u2192 %s", p$final))
   })
-  
+
   output$download_ui <- renderUI({
     req(!is.null(rv$notes_data))
     downloadButton("btn_download", "\u2b07  Download CSV",
                    class = "btn btn-outline-success w-100 mt-2",
                    style = "font-family:'IBM Plex Mono';font-size:0.78rem;")
   })
-  
+
   output$btn_download <- downloadHandler(
     filename = function() {
       fname <- trimws(input$output_filename)
       if (fname == "") fname <- "notes_llm_processed"
       fname <- gsub("\\.csv$", "", fname, ignore.case = TRUE)
-      fname <- gsub("[^A-Za-z0-9_\\-]", "_", fname)
+      fname <- gsub("[^A-Za-z0-9_-]", "_", fname)
       paste0(fname, ".csv")
     },
     content = function(file) readr::write_csv(rv$notes_data, file)
   )
-  
+
   # ── Results table ──
   present_col_name <- reactive({
     key <- rv$active_diagnosis
     preset <- DIAGNOSIS_PRESETS[[key]]
     preset$cols[1]
   })
-  
+
   filtered_data <- reactive({
     req(rv$notes_data)
     df <- rv$notes_data; key <- rv$active_diagnosis; preset <- DIAGNOSIS_PRESETS[[key]]
@@ -2048,7 +3280,7 @@ server <- function(input, output, session) {
     }
     df
   })
-  
+
   output$results_area <- renderUI({
     if (is.null(rv$notes_data)) {
       div(class = "empty-state",
@@ -2083,7 +3315,7 @@ server <- function(input, output, session) {
       )
     }
   })
-  
+
   output$failure_banner <- renderUI({
     req(rv$notes_data)
     if (!("review_status" %in% names(rv$notes_data))) return(NULL)
@@ -2096,7 +3328,7 @@ server <- function(input, output, session) {
                 n_fail,
                 if (n_na > 0) sprintf(" and %d row(s) were never processed", n_na) else ""))
   })
-  
+
   output$results_count_badge <- renderUI({
     req(rv$notes_data); key <- rv$active_diagnosis
     badge_class <- paste0("pill-tag diag-", key)
@@ -2104,7 +3336,7 @@ server <- function(input, output, session) {
       span(sprintf("%d / %d rows", nrow(filtered_data()), nrow(rv$notes_data)), class = "pill-tag pill-pending"),
       span(DIAGNOSIS_PRESETS[[key]]$label, class = badge_class, style = "margin-left:6px;"))
   })
-  
+
   output$results_table <- DT::renderDataTable({
     df <- filtered_data()
     DT::datatable(head(df, 200), selection = "single",
@@ -2113,7 +3345,7 @@ server <- function(input, output, session) {
                                    "function(s,j){$(this.api().table().container()).css({'background':'#0d1117','color':'#e6edf3'});}")),
                   rownames = FALSE, class = "display compact")
   })
-  
+
   observeEvent(input$results_table_rows_selected, {
     row_idx <- input$results_table_rows_selected
     if (!is.null(row_idx) && !is.null(rv$notes_data)) {
@@ -2125,13 +3357,13 @@ server <- function(input, output, session) {
       }
     }
   })
-  
+
   output$note_preview_header <- renderUI({
     req(rv$selected_row)
     div(class = "form-label", style = "margin-top:12px;",
         sprintf("Note Text Preview \u2014 NOTE_ID %s", rv$selected_row$NOTE_ID))
   })
-  
+
   output$note_preview_box <- renderUI({
     if (is.null(rv$selected_row)) {
       return(div(class = "note-preview-placeholder",
@@ -2183,27 +3415,31 @@ server <- function(input, output, session) {
       div(class = "note-preview-box", txt)
     )
   })
-  
+
   # ── Main pipeline ──
   observeEvent(input$btn_run, {
     if (rv$processing) { showNotification("Pipeline already running.", type = "warning"); return() }
     rv$stop_flag <- FALSE; rv$processing <- TRUE; rv$notes_data <- NULL; rv$selected_row <- NULL
     rv$start_time <- Sys.time(); rv$progress_i <- 0; rv$progress_n <- 0; rv$n_failed <- 0
-    
+    rv$total_input_tokens <- 0; rv$total_output_tokens <- 0; rv$total_api_calls <- 0
+    rv$total_thought_tokens <- 0
+    rv$run_elapsed_secs <- 0; rv$run_finished <- FALSE
+
     provider <- input$llm_provider
+    rv$run_model <- if (provider == "vertex") input$ai_model_vertex else input$lm_model_input
     vertex_cfg <- build_vertex_cfg(); lm_cfg <- build_lm_cfg(); db_cfg <- build_db_cfg()
     preset_key <- input$diagnosis_preset; preset <- DIAGNOSIS_PRESETS[[preset_key]]
     active_schema <- preset$schema; active_cols <- preset$cols
     prompt_tmpl <- input$prompt_template
     conf_threshold <- suppressWarnings(as.numeric(input$conf_threshold))
     if (is.na(conf_threshold)) conf_threshold <- 0.7
-    
+
     log_add("\u2550\u2550\u2550 Pipeline started \u2550\u2550\u2550")
     log_add(sprintf("Diagnosis: %s", preset$label))
     log_add(sprintf("Provider:  %s", if (provider == "vertex") "Vertex AI (Gemini)" else paste("LM Studio \u2014", lm_cfg$model)))
-    
+
     on.exit({ rv$processing <- FALSE }, add = TRUE)
-    
+
     withProgress(message = "Running pipeline...", value = 0, {
       if (provider == "vertex") {
         log_add("Checking GCP authentication...")
@@ -2219,7 +3455,7 @@ server <- function(input, output, session) {
         if (!lm_check$ok) { log_add("\u2717 LM Studio not reachable. Aborting."); showNotification(paste("LM Studio error:", lm_check$msg), type = "error", duration = NULL); return() }
         log_add(sprintf("\u2713 LM Studio OK (model: %s)", lm_cfg$model))
       }
-      
+
       notes_data <- NULL; want_file_mode <- isTRUE(input$use_csv_mode)
       if (want_file_mode && is.null(input$upload_file)) {
         log_add("\u2717 'Use uploaded file' is checked, but no file has finished uploading yet.")
@@ -2242,10 +3478,10 @@ server <- function(input, output, session) {
         DBI::dbDisconnect(conn)
         if (!is.null(notes_data)) log_add(sprintf("\u2713 Query returned %d rows", nrow(notes_data)))
       }
-      
+
       if (is.null(notes_data)) { log_add("\u2717 No data."); return() }
       if (!("NOTE_TEXT" %in% names(notes_data))) { log_add("\u2717 NOTE_TEXT column missing."); showNotification("NOTE_TEXT column missing.", type = "error", duration = NULL); return() }
-      
+
       for (col in active_cols) { if (!(col %in% names(notes_data))) notes_data[[col]] <- NA_character_ }
       if (!("review_status" %in% names(notes_data))) notes_data[["review_status"]] <- NA_character_
       if (!("extract_error"  %in% names(notes_data))) notes_data[["extract_error"]]  <- NA_character_
@@ -2253,19 +3489,19 @@ server <- function(input, output, session) {
         for (rspec in preset$review_specs)
           if (!(rspec$out %in% names(notes_data))) notes_data[[rspec$out]] <- NA_character_
       rv$active_diagnosis <- preset_key
-      
+
       max_r <- as.integer(input$max_rows)
       n_rows <- if (max_r > 0) min(nrow(notes_data), max_r) else nrow(notes_data)
       if (max_r > 0 && max_r < nrow(notes_data)) log_add(sprintf("\u2139 Cap: %d of %d rows", n_rows, nrow(notes_data)))
-      
+
       rv$progress_n <- n_rows; rv$progress_i <- 0; rv$start_time <- Sys.time(); rv$notes_data <- notes_data
       log_add(sprintf("Extracting %d rows...", n_rows))
-      
+
       resume_skip  <- isTRUE(input$resume_skip)
       retry_failed <- isTRUE(input$retry_failed)
       present_marker <- preset$present_field; if (is.null(present_marker)) present_marker <- preset$cols[1]
       FAILED_STATUSES <- c("failed_api", "failed_parse")
-      
+
       # A row counts as "already done" only if it has a NON-failure status.
       # Failure statuses are re-attempted when retry_failed is TRUE.
       is_done <- function(idx) {
@@ -2276,31 +3512,31 @@ server <- function(input, output, session) {
         if (has_rs && retry_failed && as.character(rsv) %in% FAILED_STATUSES) return(FALSE)
         has_rs || has_pm
       }
-      
+
       n_skipped <- 0L; n_failed_run <- 0L
       if (resume_skip) {
         already <- sum(vapply(seq_len(n_rows), is_done, logical(1)))
         if (already > 0) log_add(sprintf("\u21bb Resume on: %d of %d rows already processed will be skipped.", already, n_rows))
         if (retry_failed) log_add("\u21bb Retry mode: rows marked failed_api / failed_parse WILL be re-attempted.")
       }
-      
+
       for (i in seq_len(n_rows)) {
         if (rv$stop_flag) { log_add("\u23f9 Stopped at row", i); break }
-        
+
         if (resume_skip && is_done(i)) {
           n_skipped <- n_skipped + 1L
           rv$progress_i <- i
           incProgress(1 / max(n_rows, 1), detail = sprintf("Row %d / %d (skipped)", i, n_rows))
           next
         }
-        
+
         if (provider == "vertex" && i > 1 && i %% 200 == 0) {
           log_add("[INFO] Refreshing GCP token...")
           gcp <- check_gcp_auth()
           if (!gcp$ok) { log_add("\u2717 Token refresh failed."); break }
           rv$gcp_token <- gcp$token; log_add("\u2713 Token refreshed")
         }
-        
+
         current_text <- notes_data$NOTE_TEXT[i]
         if (is.na(current_text) || nchar(trimws(current_text)) < 5) {
           # TERMINAL STATUS — never leave this row silently blank.
@@ -2311,7 +3547,7 @@ server <- function(input, output, session) {
           incProgress(1 / max(n_rows, 1), detail = sprintf("Row %d / %d", i, n_rows))
           next
         }
-        
+
         log_add(sprintf("Processing row %d...", i))
         prompt_tmpl_row <- prompt_tmpl
         if (!is.null(preset$tier_column) && preset$tier_column %in% names(notes_data)) {
@@ -2326,17 +3562,23 @@ server <- function(input, output, session) {
         full_prompt <- sprintf(prompt_tmpl_row, current_text)
         success <- FALSE; attempts <- 0
         last_reason <- NA_character_; last_detail <- NA_character_; last_raw <- NA_character_
-        
+
         while (!success && attempts < 3) {
           attempts <- attempts + 1
           if (attempts > 1) log_add(sprintf("  -> Retry attempt %d...", attempts))
-          
+
           api_result <- call_llm(full_prompt, provider, rv$gcp_token, vertex_cfg, lm_cfg, active_schema)
           json_response <- api_result$text; finish_reason <- api_result$reason; err_detail <- api_result$detail
+          if (!is.null(api_result$usage)) {
+            rv$total_input_tokens  <- rv$total_input_tokens  + num0(api_result$usage$input_tokens)
+            rv$total_output_tokens <- rv$total_output_tokens + num0(api_result$usage$output_tokens)
+            rv$total_api_calls     <- rv$total_api_calls + 1
+            rv$total_thought_tokens <- rv$total_thought_tokens + num0(api_result$usage$thought_tokens)
+          }
           last_reason <- as.character(finish_reason)
           if (!is.null(err_detail) && length(err_detail) > 0)
             last_detail <- substr(gsub("\\s+", " ", as.character(err_detail)), 1, 300)
-          
+
           if (!is.na(json_response)) {
             last_raw <- substr(json_response, 1, 300)
             clean_json <- repair_json(clean_json_fence(json_response))
@@ -2386,7 +3628,7 @@ server <- function(input, output, session) {
           }
           if (input$sleep_secs > 0) Sys.sleep(input$sleep_secs)
         }
-        
+
         # ---------------------------------------------------------------------
         # TERMINAL STATUS GUARANTEE
         # If every attempt failed, this row STILL gets a status and a reason.
@@ -2407,10 +3649,10 @@ server <- function(input, output, session) {
                           notes_data[["review_status"]][i],
                           substr(last_reason %||% "unknown", 1, 120)))
         }
-        
+
         rv$progress_i <- i
         incProgress(1 / max(n_rows, 1), detail = sprintf("Row %d / %d", i, n_rows))
-        
+
         if (i %% input$autosave_every == 0) {
           autosave_path <- resolved_output_path()$autosave
           tryCatch(readr::write_csv(notes_data, autosave_path),
@@ -2419,7 +3661,7 @@ server <- function(input, output, session) {
           rv$notes_data <- notes_data
         }
       }
-      
+
       rv$notes_data <- notes_data
       rv$n_failed <- n_failed_run
       out_path <- resolved_output_path()
@@ -2432,10 +3674,10 @@ server <- function(input, output, session) {
         readr::write_csv(notes_data, fallback)
         log_add(sprintf("\u26a0 Fallback save: %s", fallback))
       })
-      
+
       if (resume_skip && n_skipped > 0)
         log_add(sprintf("\u21bb Skipped %d already-processed rows; processed %d new.", n_skipped, n_rows - n_skipped))
-      
+
       # Final reconciliation — prove every processed row has a status.
       rs_final <- notes_data[["review_status"]][seq_len(n_rows)]
       n_na_final <- sum(is.na(rs_final))
@@ -2445,11 +3687,731 @@ server <- function(input, output, session) {
         log_add(sprintf("\u26a0 %d row(s) still have no status (stopped early?).", n_na_final))
       else
         log_add("\u2713 Status check: every processed row has a review_status.")
-      
+
+      rv$run_elapsed_secs <- as.numeric(difftime(Sys.time(), rv$start_time, units = "secs"))
+      rv$run_finished <- TRUE
+      log_add(sprintf("\u2139 Tokens used: %s in / %s out across %d call(s) \u2014 elapsed %s",
+                      format(round(rv$total_input_tokens), big.mark = ","),
+                      format(round(rv$total_output_tokens), big.mark = ","),
+                      rv$total_api_calls,
+                      format(round(rv$run_elapsed_secs), big.mark = ",")))
       log_add("\u2550\u2550\u2550 Pipeline complete \u2550\u2550\u2550")
       session$sendCustomMessage("collapse-log", list())
     })
   })
+
+  # Model dropdown -> auto-fill the Usage & Cost price fields
+  observeEvent(input$ai_model_vertex, {
+    p <- model_pricing(input$ai_model_vertex)
+    if (!is.null(p)) {
+      updateNumericInput(session, "cost_per_1m_input",  value = p$price_in)
+      updateNumericInput(session, "cost_per_1m_output", value = p$price_out)
+    }
+  }, ignoreInit = FALSE)
+
+  output$model_price_note <- renderUI({
+    m <- input$ai_model_vertex
+    p <- model_pricing(m)
+    msg <- NULL
+    if (is.null(p)) {
+      msg <- sprintf("%s is not in the price list \u2014 enter its rates manually.", m)
+    } else if (nzchar(p$note)) {
+      msg <- sprintf("%s: %s", m, p$note)
+    }
+    if (is.null(msg)) return(NULL)
+    div(style = "font-size:0.72rem;color:#d29922;margin:2px 0 6px 0;", "\u26a0 ", msg)
+  })
+
+  observeEvent(input$btn_reset_usage, {
+    rv$total_thought_tokens <- 0
+    rv$total_input_tokens <- 0; rv$total_output_tokens <- 0; rv$total_api_calls <- 0
+    rv$run_elapsed_secs <- 0; rv$run_finished <- FALSE
+    log_add("Usage counters reset.")
+  })
+
+  # ── Usage & Cost tab ──
+  output$usage_summary_ui <- renderUI({
+    in_tok  <- rv$total_input_tokens  %||% 0
+    out_tok <- rv$total_output_tokens %||% 0
+    tot_tok <- in_tok + out_tok
+    calls   <- rv$total_api_calls %||% 0
+
+    # Live-update elapsed time while a run is in progress; freeze once done.
+    elapsed <- if (isTRUE(rv$processing) && !is.null(rv$start_time)) {
+      as.numeric(difftime(Sys.time(), rv$start_time, units = "secs"))
+    } else {
+      rv$run_elapsed_secs %||% 0
+    }
+
+    fmt_duration <- function(s) {
+      s <- max(0, round(s))
+      h <- s %/% 3600L; m <- (s %% 3600L) %/% 60L; sec <- s %% 60L
+      if (h > 0) sprintf("%dh %dm %ds", h, m, sec)
+      else if (m > 0) sprintf("%dm %ds", m, sec)
+      else sprintf("%ds", sec)
+    }
+
+    price_in  <- suppressWarnings(as.numeric(input$cost_per_1m_input));  if (is.na(price_in))  price_in  <- 0
+    price_out <- suppressWarnings(as.numeric(input$cost_per_1m_output)); if (is.na(price_out)) price_out <- 0
+    cost_in   <- (in_tok  / 1e6) * price_in
+    cost_out  <- (out_tok / 1e6) * price_out
+    cost_tot  <- cost_in + cost_out
+
+    is_local <- !is.null(input$llm_provider) && input$llm_provider == "lmstudio"
+
+    tile <- function(label, value, sub = NULL) {
+      div(style = "background:#161b22;border:1px solid #30363d;border-radius:8px;padding:12px 16px;min-width:150px;flex:1 1 150px;",
+          div(style = "font-size:0.68rem;color:#8b949e;text-transform:uppercase;letter-spacing:0.05em;", label),
+          div(style = "font-family:'IBM Plex Mono';font-size:1.3rem;font-weight:700;color:#e6edf3;margin-top:4px;", value),
+          if (!is.null(sub)) div(style = "font-size:0.7rem;color:#8b949e;margin-top:2px;", sub))
+    }
+
+    sel_model <- if (is_local) input$lm_model_input else input$ai_model_vertex
+    run_model <- rv$run_model
+    mismatch  <- !is.null(run_model) && !identical(run_model, sel_model) && calls > 0
+    thought   <- rv$total_thought_tokens %||% 0
+
+    div(
+      if (mismatch)
+        div(style = "font-size:0.75rem;color:#d29922;margin-bottom:8px;",
+            sprintf("\u26a0 Last run used %s, but prices below are for %s. Switch the Model back to %s for an accurate cost.",
+                    run_model, sel_model, run_model)),
+      div(style = "display:flex;flex-wrap:wrap;gap:12px;",
+          tile("Model", run_model %||% sel_model %||% "\u2014",
+               if (is_local) "LM Studio" else "Vertex AI"),
+          tile("API Calls", format(calls, big.mark = ",")),
+          tile("Input Tokens", format(round(in_tok), big.mark = ",")),
+          tile("Output Tokens", format(round(out_tok), big.mark = ","),
+               if (thought > 0) sprintf("incl. %s reasoning", format(round(thought), big.mark = ",")) else NULL),
+          tile("Total Tokens", format(round(tot_tok), big.mark = ",")),
+          tile(if (isTRUE(rv$processing)) "Elapsed (running)" else "Run Time",
+               fmt_duration(elapsed),
+               if (calls > 0) sprintf("%.1fs / call avg", elapsed / calls) else NULL),
+          tile(if (is_local) "Cost (local = free)" else "Estimated Cost",
+               if (is_local) "$0.00" else sprintf("$%.4f", cost_tot),
+               if (!is_local) sprintf("in $%.4f + out $%.4f", cost_in, cost_out) else "LM Studio runs locally")
+      )
+    )
+  })
+  # =========================================================================
+  # MODEL A/B COMPARISON TAB
+  # =========================================================================
+  ab_rv <- reactiveValues(res = NULL, err = NULL)
+
+  ab_tile <- function(label, value, sub = NULL, accent = "#e6edf3") {
+    div(style = "background:#161b22;border:1px solid #30363d;border-radius:8px;padding:12px 16px;min-width:150px;flex:1 1 150px;",
+        div(style = "font-size:0.68rem;color:#8b949e;text-transform:uppercase;letter-spacing:0.05em;", label),
+        div(style = paste0("font-family:'IBM Plex Mono';font-size:1.3rem;font-weight:700;margin-top:4px;color:", accent, ";"), value),
+        if (!is.null(sub)) div(style = "font-size:0.7rem;color:#8b949e;margin-top:2px;", sub))
+  }
+
+  ab_data_a <- reactive({
+    fi <- input$ab_file_a; req(fi)
+    ab_read_file(fi$datapath, fi$name, input$ab_sheet_a)
+  })
+  ab_data_b <- reactive({
+    fi <- input$ab_file_b; req(fi)
+    ab_read_file(fi$datapath, fi$name, input$ab_sheet_b)
+  })
+
+  output$ab_sheet_a_ui <- renderUI({
+    req(input$ab_file_a)
+    if (!(tolower(tools::file_ext(input$ab_file_a$name)) %in% c("xlsx", "xls"))) return(NULL)
+    sh <- tryCatch(readxl::excel_sheets(input$ab_file_a$datapath), error = function(e) NULL)
+    if (is.null(sh) || length(sh) == 0) return(NULL)
+    selectInput("ab_sheet_a", "Sheet (A)", choices = sh, selected = sh[1], width = "100%")
+  })
+  output$ab_sheet_b_ui <- renderUI({
+    req(input$ab_file_b)
+    if (!(tolower(tools::file_ext(input$ab_file_b$name)) %in% c("xlsx", "xls"))) return(NULL)
+    sh <- tryCatch(readxl::excel_sheets(input$ab_file_b$datapath), error = function(e) NULL)
+    if (is.null(sh) || length(sh) == 0) return(NULL)
+    selectInput("ab_sheet_b", "Sheet (B)", choices = sh, selected = sh[1], width = "100%")
+  })
+
+  output$ab_load_status <- renderUI({
+    a <- tryCatch(ab_data_a(), error = function(e) e)
+    b <- tryCatch(ab_data_b(), error = function(e) e)
+    msgs <- list()
+    if (inherits(a, "error")) msgs[[length(msgs) + 1]] <-
+      div(class = "pill-tag pill-danger", paste("A:", conditionMessage(a)))
+    if (inherits(b, "error")) msgs[[length(msgs) + 1]] <-
+      div(class = "pill-tag pill-danger", paste("B:", conditionMessage(b)))
+    if (length(msgs) > 0) return(div(style = "margin-top:8px;", msgs))
+    if (is.null(input$ab_file_a) || is.null(input$ab_file_b))
+      return(div(style = "font-size:0.72rem;color:#8b949e;margin-top:6px;",
+                 "Waiting for both files."))
+    shared <- intersect(names(a), names(b))
+    div(style = "margin-top:8px;display:flex;flex-wrap:wrap;gap:6px;",
+        span(class = "pill-tag pill-info", sprintf("A: %d rows \u00D7 %d cols", nrow(a), ncol(a))),
+        span(class = "pill-tag pill-info", sprintf("B: %d rows \u00D7 %d cols", nrow(b), ncol(b))),
+        span(class = if (length(shared) > 0) "pill-tag pill-success" else "pill-tag pill-danger",
+             sprintf("%d shared column(s)", length(shared))),
+        if (nrow(a) != nrow(b))
+          span(class = "pill-tag pill-warn",
+               sprintf("row counts differ by %d \u2014 unmatched rows are reported, not silently dropped",
+                       abs(nrow(a) - nrow(b)))))
+  })
+
+  # Populate the key / field / compare selectors once both files are readable.
+  observe({
+    a <- tryCatch(ab_data_a(), error = function(e) NULL)
+    b <- tryCatch(ab_data_b(), error = function(e) NULL)
+    if (is.null(a) || is.null(b)) return()
+    shared <- intersect(names(a), names(b))
+    keys <- intersect(AB_KEY_CANDIDATES, shared)
+    key_choices <- c(stats::setNames(keys, keys), "(match by row order)" = "__ROWORDER__")
+    updateSelectInput(session, "ab_join_key", choices = key_choices,
+                      selected = if (length(keys) > 0) keys[1] else "__ROWORDER__")
+
+    cand <- setdiff(shared, c(AB_NON_COMPARE, AB_KEY_CANDIDATES))
+    pk <- ab_detect_preset(shared)
+    default_primary <- NULL
+    if (!is.null(pk)) {
+      pf <- DIAGNOSIS_PRESETS[[pk]]$present_field
+      if (!is.null(pf) && pf %in% cand) default_primary <- pf
+    }
+    if (is.null(default_primary)) {
+      g <- grep("_present$|_result$|^target_present$|supports", cand, value = TRUE)
+      default_primary <- if (length(g) > 0) g[1] else if (length(cand) > 0) cand[1] else NULL
+    }
+    updateSelectInput(session, "ab_primary_field", choices = cand, selected = default_primary)
+
+    # Default to the detected preset's OWN columns rather than every shared
+    # column. A note pull carries the whole cohort frame alongside the model
+    # output -- gestational age, birth weight, order IDs, department names --
+    # and those are identical in both files by construction. Comparing them
+    # yields a page of 100%-agreement rows that pad out the real findings.
+    # Every column stays available in `choices` so nothing is hidden; only the
+    # default selection narrows.
+    drop_always <- c(default_primary, grep("evidence_span$", cand, value = TRUE))
+    if (!is.null(pk) && !is.null(DIAGNOSIS_PRESETS[[pk]]$cols)) {
+      extras <- setdiff(intersect(DIAGNOSIS_PRESETS[[pk]]$cols, cand), drop_always)
+    } else {
+      # No preset recognised, so there is no reliable way to tell model output
+      # from passthrough. Select everything rather than guess with a name
+      # pattern, which could silently hide a real extracted field.
+      extras <- setdiff(cand, drop_always)
+    }
+    updateSelectizeInput(session, "ab_compare_fields", choices = cand, selected = extras)
+  })
+
+  output$ab_gold_ui <- renderUI({
+    if (!identical(input$ab_mode, "gold")) return(NULL)
+    a <- tryCatch(ab_data_a(), error = function(e) NULL)
+    b <- tryCatch(ab_data_b(), error = function(e) NULL)
+    if (is.null(a) || is.null(b))
+      return(div(style = "font-size:0.72rem;color:#d29922;", "Load both files to pick a gold column."))
+    ch <- c(stats::setNames(paste0(names(a), "__A"), paste0(names(a), "  (from A)")),
+            stats::setNames(paste0(names(b), "__B"), paste0(names(b), "  (from B)")))
+    guess <- grep("gold|truth|adjudicat|chart_review|reviewer|manual",
+                  names(ch), ignore.case = TRUE, value = TRUE)
+    div(
+      div(class = "form-label", "Gold-standard column (expert chart review)"),
+      selectInput("ab_gold_col", label = NULL, choices = ch,
+                  selected = if (length(guess) > 0) ch[[guess[1]]] else NULL, width = "100%"),
+      div(style = "font-size:0.72rem;color:#8b949e;",
+          "The human label. Uses the same positive values as above. Rows where this is blank are left out of the scored denominator.")
+    )
+  })
+
+  observeEvent(input$ab_run, {
+    ab_rv$res <- NULL; ab_rv$err <- NULL
+    a <- tryCatch(ab_data_a(), error = function(e) e)
+    b <- tryCatch(ab_data_b(), error = function(e) e)
+    if (inherits(a, "error") || inherits(b, "error")) {
+      ab_rv$err <- "Could not read one of the files."; return()
+    }
+    a <- as.data.frame(a, stringsAsFactors = FALSE)
+    b <- as.data.frame(b, stringsAsFactors = FALSE)
+
+    pf <- input$ab_primary_field
+    if (is.null(pf) || !nzchar(pf)) { ab_rv$err <- "Pick a primary field."; return() }
+    if (!(pf %in% names(a)) || !(pf %in% names(b))) {
+      ab_rv$err <- sprintf("Primary field '%s' is not in both files.", pf); return()
+    }
+    pos <- trimws(strsplit(input$ab_pos_vals %||% "", ",")[[1]])
+    pos <- pos[nzchar(pos)]
+    if (length(pos) == 0) pos <- c("true", "yes", "1")
+
+    keys <- input$ab_join_key
+    use_row <- length(keys) == 0 || "__ROWORDER__" %in% keys
+    if (use_row) {
+      if (nrow(a) != nrow(b)) {
+        ab_rv$err <- sprintf(
+          "Row-order matching needs equal row counts (A has %d, B has %d). Pick a key column instead.",
+          nrow(a), nrow(b)); return()
+      }
+      a[["__ROWNUM__"]] <- seq_len(nrow(a))
+      b[["__ROWNUM__"]] <- seq_len(nrow(b))
+      keys <- "__ROWNUM__"
+    }
+    if (!all(keys %in% names(a)) || !all(keys %in% names(b))) {
+      ab_rv$err <- "The chosen key column is missing from one of the files."; return()
+    }
+
+    # Raw counts captured BEFORE deduplication. Reporting only the post-dedup
+    # count made a 51-row file look like a 19-row file in the Methods table.
+    n_a_raw <- nrow(a); n_b_raw <- nrow(b)
+
+    ka <- do.call(paste, c(lapply(keys, function(k) as.character(a[[k]])), sep = "\u001f"))
+    kb <- do.call(paste, c(lapply(keys, function(k) as.character(b[[k]])), sep = "\u001f"))
+    da <- duplicated(ka); db_ <- duplicated(kb)
+    dup_a <- sum(da); dup_b <- sum(db_)
+
+    # A key that collapses a large share of rows is almost always the wrong
+    # granularity -- an encounter ID on note-level data, say, where every study
+    # after the first is discarded and the comparison quietly runs on one
+    # arbitrary note per encounter. Work out whether a finer key exists so the
+    # warning can name it rather than just raise an alarm. This is evaluated on
+    # the RAW frames, before the rows are dropped, or the counts would not be
+    # comparable with dup_a.
+    dup_frac <- max(if (n_a_raw > 0) dup_a / n_a_raw else 0,
+                    if (n_b_raw > 0) dup_b / n_b_raw else 0)
+    key_is_coarse <- any(keys %in% AB_COARSE_KEYS)
+    finer_keys <- character(0)
+    if (dup_a > 0 || dup_b > 0) {
+      avail <- setdiff(intersect(AB_KEY_CANDIDATES, intersect(names(a), names(b))),
+                       c(keys, "row_id"))
+      for (cand_k in avail) {
+        d_a <- sum(duplicated(as.character(a[[cand_k]])))
+        d_b <- sum(duplicated(as.character(b[[cand_k]])))
+        if (d_a < dup_a || d_b < dup_b) finer_keys <- c(finer_keys, cand_k)
+      }
+    }
+
+    a <- a[!da, , drop = FALSE]; ka <- ka[!da]
+    b <- b[!db_, , drop = FALSE]; kb <- kb[!db_]
+
+    common <- intersect(ka, kb)
+    if (length(common) == 0) {
+      ab_rv$err <- "No rows matched on the chosen key. Check that the key column holds the same IDs in both files."
+      return()
+    }
+    ia <- match(common, ka); ib <- match(common, kb)
+    A <- a[ia, , drop = FALSE]; B <- b[ib, , drop = FALSE]
+
+    shared <- intersect(names(a), names(b))
+    joined <- data.frame(row_key = common, stringsAsFactors = FALSE)
+    for (cn in shared) {
+      joined[[paste0(cn, "__A")]] <- A[[cn]]
+      joined[[paste0(cn, "__B")]] <- B[[cn]]
+    }
+    for (cn in setdiff(names(a), shared)) joined[[paste0(cn, "__A")]] <- A[[cn]]
+    for (cn in setdiff(names(b), shared)) joined[[paste0(cn, "__B")]] <- B[[cn]]
+
+    pa <- ab_to_logical(joined[[paste0(pf, "__A")]], pos)
+    pb <- ab_to_logical(joined[[paste0(pf, "__B")]], pos)
+    both <- !is.na(pa) & !is.na(pb)
+    n_both <- sum(both)
+    n_agree <- if (n_both > 0) sum(pa[both] == pb[both]) else 0
+    kap <- ab_cohen_kappa(ifelse(is.na(pa), NA_character_, as.character(pa)),
+                          ifelse(is.na(pb), NA_character_, as.character(pb)))
+    mc <- ab_mcnemar(pa, pb)
+
+    la <- if (nzchar(trimws(input$ab_label_a %||% ""))) trimws(input$ab_label_a) else "Model A"
+    lb <- if (nzchar(trimws(input$ab_label_b %||% ""))) trimws(input$ab_label_b) else "Model B"
+    # The audit table is grouped by label, so identical labels would merge the
+    # two models into one set of rows.
+    if (identical(la, lb)) { la <- paste0(la, " (A)"); lb <- paste0(lb, " (B)") }
+
+    mk_row <- function(nm, ref_nm, m) data.frame(
+      comparison = nm, reference = ref_nm,
+      N_scored = m$N, TP = m$TP, FP = m$FP, FN = m$FN, TN = m$TN,
+      precision_PPV = m$precision, recall_sensitivity = m$recall, F1 = m$f1,
+      specificity = m$specificity, NPV = m$npv, accuracy = m$accuracy,
+      precision_95CI = ab_fmt_rate(m$TP, m$TP + m$FP),
+      recall_95CI    = ab_fmt_rate(m$TP, m$TP + m$FN),
+      stringsAsFactors = FALSE)
+
+    mode <- input$ab_mode %||% "agree"
+    met_tbl <- NULL; gold_vec <- NULL; mode_note <- NULL
+    if (identical(mode, "ref_a")) {
+      met_tbl <- mk_row(lb, paste0(la, " (nominated reference)"), ab_binary_metrics(pa, pb))
+      mode_note <- sprintf("%s is treated as the reference. These are agreement-relative figures, not validated accuracy \u2014 a shared error in both models cannot appear here.", la)
+    } else if (identical(mode, "ref_b")) {
+      met_tbl <- mk_row(la, paste0(lb, " (nominated reference)"), ab_binary_metrics(pb, pa))
+      mode_note <- sprintf("%s is treated as the reference. These are agreement-relative figures, not validated accuracy \u2014 a shared error in both models cannot appear here.", lb)
+    } else if (identical(mode, "gold")) {
+      gc <- input$ab_gold_col
+      if (is.null(gc) || !(gc %in% names(joined))) {
+        ab_rv$err <- "Pick a gold-standard column."; return()
+      }
+      gold_vec <- ab_to_logical(joined[[gc]], pos)
+      if (sum(!is.na(gold_vec)) == 0) {
+        ab_rv$err <- sprintf("Gold column '%s' has no usable values on the matched rows.", gc); return()
+      }
+      met_tbl <- rbind(
+        mk_row(la, paste0(gc, " (gold)"), ab_binary_metrics(gold_vec, pa)),
+        mk_row(lb, paste0(gc, " (gold)"), ab_binary_metrics(gold_vec, pb)))
+      mode_note <- sprintf("Both models scored against %s. These are true accuracy figures for the rows where the gold column is filled in (n = %d).",
+                           gc, sum(!is.na(gold_vec)))
+    } else {
+      mode_note <- "Agreement only. No ground truth was supplied, so no precision or recall is reported \u2014 see the quality audit below for the checks that do not need one."
+    }
+
+    pk <- ab_detect_preset(shared)
+    model_cols <- if (!is.null(pk)) DIAGNOSIS_PRESETS[[pk]]$cols else NULL
+
+    flds <- unique(c(pf, input$ab_compare_fields))
+    flds <- intersect(flds, shared)
+    fld_tbl <- if (length(flds) > 0) ab_field_agreement(joined, flds, model_cols) else data.frame()
+
+    aud <- rbind(
+      ab_quality_audit(a, la, pf, pos, "NOTE_TEXT", pk),
+      ab_quality_audit(b, lb, pf, pos, "NOTE_TEXT", pk))
+
+    # ---- disagreement listing -------------------------------------------
+    d_flip <- which(both & (pa != pb))
+    d_one  <- which(xor(is.na(pa), is.na(pb)))
+    idx <- c(d_flip, d_one)
+    dtype <- c(rep("opposite call", length(d_flip)), rep("one model gave no call", length(d_one)))
+    ev_a <- grep("evidence_span__A$", names(joined), value = TRUE)
+    ev_b <- grep("evidence_span__B$", names(joined), value = TRUE)
+    note_col <- if ("NOTE_TEXT__A" %in% names(joined)) "NOTE_TEXT__A" else
+      if ("NOTE_TEXT__B" %in% names(joined)) "NOTE_TEXT__B" else NULL
+
+    dis <- data.frame(row_key = character(0), stringsAsFactors = FALSE)
+    if (length(idx) > 0) {
+      dis <- data.frame(
+        row_key = joined$row_key[idx],
+        disagreement = dtype,
+        stringsAsFactors = FALSE)
+      dis[[paste0(pf, " [A] ", la)]] <- as.character(joined[[paste0(pf, "__A")]])[idx]
+      dis[[paste0(pf, " [B] ", lb)]] <- as.character(joined[[paste0(pf, "__B")]])[idx]
+      if (!is.null(gold_vec)) dis[["gold"]] <- as.character(gold_vec)[idx]
+      for (ec in ev_a) dis[[paste0("A: ", sub("__A$", "", ec))]] <- as.character(joined[[ec]])[idx]
+      for (ec in ev_b) dis[[paste0("B: ", sub("__B$", "", ec))]] <- as.character(joined[[ec]])[idx]
+      if ("review_status__A" %in% names(joined)) dis[["A: review_status"]] <- as.character(joined[["review_status__A"]])[idx]
+      if ("review_status__B" %in% names(joined)) dis[["B: review_status"]] <- as.character(joined[["review_status__B"]])[idx]
+      if (!is.null(note_col)) dis[["NOTE_TEXT"]] <- as.character(joined[[note_col]])[idx]
+    }
+
+    hr_a <- aud[aud$model == la & grepl("^Hallucinated quote", aud$metric), , drop = FALSE]
+    hr_b <- aud[aud$model == lb & grepl("^Hallucinated quote", aud$metric), , drop = FALSE]
+    # NA (shown as an em dash), never 0, when the check could not be run --
+    # a missing NOTE_TEXT column must not look like a clean bill of health.
+    ab_hall_rate <- function(sub) {
+      if (nrow(sub) == 0) return(NA_real_)
+      den <- sum(sub$denom, na.rm = TRUE)
+      if (!is.finite(den) || den == 0) return(NA_real_)
+      sum(sub$count, na.rm = TRUE) / den
+    }
+    hall_a <- ab_hall_rate(hr_a)
+    hall_b <- ab_hall_rate(hr_b)
+
+    ab_rv$res <- list(
+      la = la, lb = lb, pf = pf, pos = pos, mode = mode, mode_note = mode_note,
+      n_a = nrow(a), n_b = nrow(b),
+      n_a_raw = n_a_raw, n_b_raw = n_b_raw,
+      n_matched = length(common),
+      unmatched_a = nrow(a) - length(common), unmatched_b = nrow(b) - length(common),
+      dup_a = dup_a, dup_b = dup_b, dup_frac = dup_frac,
+      key_desc = paste(keys, collapse = " + "),
+      key_is_coarse = key_is_coarse, finer_keys = finer_keys,
+      n_both = n_both, n_agree = n_agree,
+      pct_agree = if (n_both > 0) n_agree / n_both else NA_real_,
+      kappa = kap, mc = mc,
+      met_tbl = met_tbl, fld_tbl = fld_tbl, aud = aud, dis = dis,
+      hall_a = hall_a, hall_b = hall_b,
+      preset = pk, model_cols = model_cols, joined = joined)
+
+    log_add(sprintf("A/B comparison: %d matched rows \u2014 %.1f%% agreement, kappa %s",
+                    length(common), 100 * (if (n_both > 0) n_agree / n_both else NA_real_),
+                    ab_fmt_num(kap)))
+    if (dup_frac >= 0.10)
+      log_add(sprintf("\u26a0 %.0f%% of rows dropped as duplicate keys on '%s' \u2014 check key granularity.",
+                      100 * dup_frac, paste(keys, collapse = " + ")))
+  })
+
+  output$ab_results_ui <- renderUI({
+    if (!is.null(ab_rv$err))
+      return(div(class = "section-card",
+                 div(style = "color:#f85149;font-size:0.8rem;", paste("\u2717", ab_rv$err))))
+    r <- ab_rv$res
+    if (is.null(r)) return(NULL)
+
+    kap_txt <- ab_fmt_num(r$kappa)
+    p_txt <- if (is.na(r$mc$p_value)) "\u2014" else
+      if (r$mc$p_value < 0.001) "< 0.001" else sprintf("%.3f", r$mc$p_value)
+    p_accent <- if (!is.na(r$mc$p_value) && r$mc$p_value < 0.05) "#d29922" else "#e6edf3"
+
+    tagList(
+      div(class = "section-card",
+          div(class = "section-title", "Headline"),
+          div(style = "display:flex;flex-wrap:wrap;gap:12px;",
+              ab_tile("Matched rows", format(r$n_matched, big.mark = ","),
+                      sprintf("A %s / B %s", format(r$n_a, big.mark = ","), format(r$n_b, big.mark = ","))),
+              ab_tile("Agreement", if (is.na(r$pct_agree)) "\u2014" else sprintf("%.1f%%", 100 * r$pct_agree),
+                      sprintf("%d of %d scored rows", r$n_agree, r$n_both)),
+              ab_tile("Cohen's kappa", kap_txt, ab_kappa_label(r$kappa)),
+              ab_tile("McNemar p", p_txt,
+                      sprintf("%d discordant (%d A-only, %d B-only)",
+                              r$mc$n_discordant, r$mc$a_only, r$mc$b_only), p_accent),
+              ab_tile(paste0("Hallucination \u2014 ", r$la),
+                      if (is.na(r$hall_a)) "\u2014" else sprintf("%.1f%%", 100 * r$hall_a),
+                      "quotes not found in the note"),
+              ab_tile(paste0("Hallucination \u2014 ", r$lb),
+                      if (is.na(r$hall_b)) "\u2014" else sprintf("%.1f%%", 100 * r$hall_b),
+                      "quotes not found in the note")
+          ),
+          div(style = "font-size:0.75rem;color:#8b949e;margin-top:10px;line-height:1.6;",
+              sprintf("Primary field: %s. Positive = {%s}. %s",
+                      r$pf, paste(r$pos, collapse = ", "),
+                      if (!is.null(r$preset)) paste0("Detected preset: ", r$preset, ".") else "")),
+          # A key that collapses a tenth or more of the data gets a loud banner,
+          # not a grey footnote: every figure above is computed on what survived.
+          if (isTRUE(r$dup_frac >= 0.10))
+            div(style = paste0("background:rgba(248,81,73,0.10);border:1px solid rgba(248,81,73,0.45);",
+                               "border-radius:6px;padding:10px 14px;margin-top:10px;",
+                               "font-size:0.78rem;color:#f85149;line-height:1.6;"),
+                tags$b(sprintf("\u26A0 %.0f%% of rows were discarded as duplicate keys.",
+                               100 * r$dup_frac)),
+                tags$br(),
+                sprintf("A had %s rows, %s kept. B had %s rows, %s kept. Matching on %s.",
+                        format(r$n_a_raw, big.mark = ","), format(r$n_a, big.mark = ","),
+                        format(r$n_b_raw, big.mark = ","), format(r$n_b, big.mark = ","),
+                        r$key_desc),
+                tags$br(),
+                if (isTRUE(r$key_is_coarse))
+                  sprintf("%s identifies a patient or encounter, not a row. One encounter has many notes or studies, so all but the first were dropped and every figure above describes one arbitrary row per %s. ",
+                          r$key_desc, r$key_desc)
+                else
+                  "Every row after the first for each key was dropped, so the figures above describe a subset. ",
+                if (length(r$finer_keys) > 0)
+                  tags$span("A finer key is available in both files: ",
+                            tags$b(paste(r$finer_keys, collapse = ", ")),
+                            ". Re-run with that selected.")
+                else
+                  "No finer key was found in both files; check whether the export carries a note or order identifier."),
+          if (r$unmatched_a > 0 || r$unmatched_b > 0 || (r$dup_a > 0 && !isTRUE(r$dup_frac >= 0.10)))
+            div(style = "font-size:0.75rem;color:#d29922;margin-top:6px;",
+                sprintf("\u26A0 Unmatched: %d row(s) only in A, %d only in B. Duplicate keys dropped: %d in A, %d in B.",
+                        r$unmatched_a, r$unmatched_b, r$dup_a, r$dup_b)),
+          div(style = "font-size:0.75rem;color:#58a6ff;margin-top:8px;line-height:1.6;", r$mode_note),
+          div(style = "font-size:0.72rem;color:#8b949e;margin-top:6px;line-height:1.6;",
+              paste0("McNemar tests whether the two models differ on the same notes, using only the rows where ",
+                     "they disagree \u2014 the rows they both call the same way carry no information about a difference. ",
+                     "A small p means one model systematically calls more positives than the other; it does not say which one is right."))
+      ),
+
+      if (!is.null(r$met_tbl))
+        div(class = "section-card",
+            div(class = "section-title",
+                if (identical(r$mode, "gold")) "Accuracy against gold standard" else "Relative metrics (not validated accuracy)"),
+            DT::dataTableOutput("ab_met_table"),
+            div(style = "font-size:0.72rem;color:#8b949e;margin-top:8px;line-height:1.6;",
+                paste0("PPV = precision = of the rows this model called positive, the share that the reference also called positive. ",
+                       "Sensitivity = recall = of the reference's positives, the share this model caught. ",
+                       "Brackets are 95% Wilson intervals, which stay inside 0\u20131 at small counts where the usual normal interval does not."))),
+
+      div(class = "section-card",
+          div(class = "section-title", "Per-field agreement"),
+          DT::dataTableOutput("ab_fld_table"),
+          div(style = "font-size:0.72rem;color:#8b949e;margin-top:8px;line-height:1.6;",
+              paste0("Sorted worst-agreement first. kappa corrects for agreement that happens by chance: with a rare ",
+                     "finding, two models can match on 95% of rows simply because both call almost everything negative. ",
+                     "mean_abs_diff is filled in only for numeric fields such as grade, stage or confidence."))),
+
+      div(class = "section-card",
+          div(class = "section-title", "Quality audit \u2014 no ground truth required"),
+          DT::dataTableOutput("ab_aud_table"),
+          div(style = "font-size:0.72rem;color:#8b949e;margin-top:8px;line-height:1.6;",
+              paste0("Every row here is checkable from the file alone. A hallucinated quote means the model returned an ",
+                     "evidence_span that is not actually in NOTE_TEXT \u2014 a model can be right about the diagnosis and still ",
+                     "fabricate the quote, which defeats the audit trail. A positive call with no quote is the same problem ",
+                     "in a different form. Schema violations mean the model ignored the declared field type."))),
+
+      div(class = "section-card",
+          div(class = "section-title",
+              sprintf("Disagreements (%d)", nrow(r$dis))),
+          if (nrow(r$dis) == 0)
+            div(style = "font-size:0.8rem;color:#3fb950;", "\u2713 No disagreements on the primary field.")
+          else tagList(
+            DT::dataTableOutput("ab_dis_table"),
+            div(style = "font-size:0.72rem;color:#8b949e;margin-top:8px;",
+                "This is the adjudication worklist: these are the rows a human has to read to decide which model is right.")
+          )),
+
+      div(class = "section-card",
+          div(class = "section-title", "Download"),
+          div(style = "display:flex;flex-wrap:wrap;gap:10px;",
+              downloadButton("ab_dl_dis", "Disagreements CSV", class = "btn btn-sm btn-outline-secondary",
+                             style = "font-family:'IBM Plex Mono';font-size:0.7rem;"),
+              downloadButton("ab_dl_met", "Metrics CSV", class = "btn btn-sm btn-outline-secondary",
+                             style = "font-family:'IBM Plex Mono';font-size:0.7rem;"),
+              downloadButton("ab_dl_fld", "Per-field agreement CSV", class = "btn btn-sm btn-outline-secondary",
+                             style = "font-family:'IBM Plex Mono';font-size:0.7rem;"),
+              downloadButton("ab_dl_aud", "Quality audit CSV", class = "btn btn-sm btn-outline-secondary",
+                             style = "font-family:'IBM Plex Mono';font-size:0.7rem;")))
+    )
+  })
+
+  ab_dt <- function(df, page = 10, trunc_cols = NULL) {
+    d <- df
+    if (!is.null(trunc_cols)) {
+      for (cn in intersect(trunc_cols, names(d))) {
+        v <- as.character(d[[cn]])
+        long <- !is.na(v) & nchar(v) > 300
+        v[long] <- paste0(substr(v[long], 1, 300), " \u2026")
+        d[[cn]] <- v
+      }
+    }
+    DT::datatable(d, selection = "none",
+                  options = list(pageLength = page, scrollX = TRUE, dom = "tp",
+                                 initComplete = DT::JS(
+                                   "function(s,j){$(this.api().table().container()).css({'background':'#0d1117','color':'#e6edf3'});}")),
+                  rownames = FALSE, class = "display compact")
+  }
+
+  output$ab_met_table <- DT::renderDataTable({
+    r <- ab_rv$res; req(r); req(r$met_tbl)
+    d <- r$met_tbl
+    for (cn in c("precision_PPV", "recall_sensitivity", "F1", "specificity", "NPV", "accuracy")) {
+      if (cn %in% names(d)) d[[cn]] <- round(d[[cn]], 3)
+    }
+    ab_dt(d, page = 5)
+  })
+
+  output$ab_fld_table <- DT::renderDataTable({
+    r <- ab_rv$res; req(r)
+    d <- r$fld_tbl
+    if (is.null(d) || nrow(d) == 0) return(ab_dt(data.frame(note = "No shared fields selected.")))
+    d$pct_agree <- round(100 * d$pct_agree, 1)
+    d$kappa <- round(d$kappa, 3)
+    d$mean_abs_diff <- round(d$mean_abs_diff, 3)
+    ab_dt(d, page = 15)
+  })
+
+  output$ab_aud_table <- DT::renderDataTable({
+    r <- ab_rv$res; req(r)
+    d <- r$aud
+    if (is.null(d) || nrow(d) == 0) return(ab_dt(data.frame(note = "Nothing to audit.")))
+    d$rate_pct <- ifelse(is.na(d$rate), NA, round(100 * d$rate, 2))
+    d <- d[, c("model", "metric", "count", "denom", "rate_pct", "detail"), drop = FALSE]
+    ab_dt(d, page = 20)
+  })
+
+  output$ab_dis_table <- DT::renderDataTable({
+    r <- ab_rv$res; req(r); req(nrow(r$dis) > 0)
+    ab_dt(r$dis, page = 10, trunc_cols = c("NOTE_TEXT", grep("^A: |^B: ", names(r$dis), value = TRUE)))
+  })
+
+  output$ab_report_status <- renderUI({
+    if (is.null(ab_rv$res))
+      return(div(style = "font-size:0.75rem;color:#8b949e;margin-bottom:8px;",
+                 "Run a comparison first \u2014 the report is built from the results above."))
+    div(style = "font-size:0.75rem;color:#3fb950;margin-bottom:8px;",
+        sprintf("\u2713 Ready \u2014 %s matched rows, %s vs %s.",
+                format(ab_rv$res$n_matched, big.mark = ","), ab_rv$res$la, ab_rv$res$lb))
+  })
+
+  # Surfaced only when the optional Word dependency is missing. The HTML report
+  # is unaffected, so this is a note rather than a blocking error.
+  output$ab_docx_note <- renderUI({
+    if (requireNamespace("officer", quietly = TRUE)) return(NULL)
+    div(style = "font-size:0.72rem;color:#d29922;margin-top:6px;",
+        "\u26A0 The 'officer' package is not installed, so the .docx button will fail. Install it once with:  install.packages(\"officer\")  \u2014 the .html report works regardless.")
+  })
+
+  # Shared by both renderers, so the two formats cannot diverge.
+  ab_report_meta <- function(r) {
+    keys <- input$ab_join_key
+    key_desc <- if (length(keys) == 0 || "__ROWORDER__" %in% keys) "row order (no key column)"
+                else paste(keys, collapse = " + ")
+    md <- suppressWarnings(as.integer(input$ab_rep_maxdis))
+    if (is.na(md) || md < 0) md <- 50
+    list(
+      title = if (nzchar(trimws(input$ab_rep_title %||% ""))) trimws(input$ab_rep_title)
+              else "NICU LLM Extraction: Model Comparison Report",
+      prepared_by = trimws(input$ab_rep_author %||% ""),
+      file_a = if (!is.null(input$ab_file_a)) input$ab_file_a$name else "(unknown)",
+      file_b = if (!is.null(input$ab_file_b)) input$ab_file_b$name else "(unknown)",
+      key_desc = key_desc,
+      gold_col = if (identical(r$mode, "gold")) input$ab_gold_col else NULL,
+      max_dis = md)
+  }
+
+  ab_report_filename <- function(ext) {
+    base <- trimws(input$ab_rep_title %||% "")
+    # Inside a POSIX bracket expression a backslash is a LITERAL character, not
+    # an escape. "[^A-Za-z0-9_\\- ]" therefore parsed as ... "_", then the range
+    # "\" (0x5C) to " " (0x20) -- which runs backwards, so TRE rejected the whole
+    # pattern and the download died before Shiny could name the file. The hyphen
+    # goes last instead, where it is unambiguously literal, and the backslash is
+    # dropped so it can never reach a Windows filename.
+    base <- gsub("[^A-Za-z0-9_ -]", "", base)
+    base <- gsub("[[:space:]]+", "_", trimws(base))
+    # Checked after stripping, so a title made only of punctuation still yields
+    # a usable name rather than a file called "_20261103_1225.html".
+    if (!nzchar(base)) base <- "model_comparison_report"
+    paste0(substr(base, 1, 60), "_", format(Sys.time(), "%Y%m%d_%H%M"), ".", ext)
+  }
+
+  output$ab_dl_html <- downloadHandler(
+    filename = function() ab_report_filename("html"),
+    content = function(file) {
+      r <- ab_rv$res
+      if (is.null(r)) stop("Run a comparison before downloading the report.")
+      ab_build_html(r, ab_report_meta(r), file)
+      log_add(sprintf("\u2713 HTML report written (%s matched rows)",
+                      format(r$n_matched, big.mark = ",")))
+    })
+
+  output$ab_dl_docx <- downloadHandler(
+    filename = function() ab_report_filename("docx"),
+    content = function(file) {
+      r <- ab_rv$res
+      if (is.null(r)) stop("Run a comparison before downloading the report.")
+      ab_build_docx(r, ab_report_meta(r), file)
+      log_add(sprintf("\u2713 Word report written (%s matched rows)",
+                      format(r$n_matched, big.mark = ",")))
+    })
+
+  ab_stamp <- function() format(Sys.time(), "%Y%m%d_%H%M")
+  output$ab_dl_dis <- downloadHandler(
+    filename = function() paste0("ab_disagreements_", ab_stamp(), ".csv"),
+    content = function(file) {
+      r <- ab_rv$res
+      readr::write_csv(if (is.null(r)) data.frame() else r$dis, file)
+    })
+  output$ab_dl_met <- downloadHandler(
+    filename = function() paste0("ab_metrics_", ab_stamp(), ".csv"),
+    content = function(file) {
+      r <- ab_rv$res
+      base <- data.frame(
+        model_a = r$la, model_b = r$lb, primary_field = r$pf,
+        positive_values = paste(r$pos, collapse = "|"),
+        scoring_mode = r$mode,
+        n_matched = r$n_matched, n_scored = r$n_both,
+        n_agree = r$n_agree, pct_agree = r$pct_agree,
+        cohens_kappa = r$kappa, kappa_strength = ab_kappa_label(r$kappa),
+        mcnemar_discordant = r$mc$n_discordant,
+        mcnemar_a_only = r$mc$a_only, mcnemar_b_only = r$mc$b_only,
+        mcnemar_p_exact = r$mc$p_value,
+        unmatched_a = r$unmatched_a, unmatched_b = r$unmatched_b,
+        duplicate_keys_a = r$dup_a, duplicate_keys_b = r$dup_b,
+        generated_at = format(Sys.time(), "%Y-%m-%d %H:%M:%S"),
+        stringsAsFactors = FALSE)
+      if (!is.null(r$met_tbl)) {
+        out <- cbind(base[rep(1, nrow(r$met_tbl)), , drop = FALSE], r$met_tbl)
+      } else {
+        out <- base
+      }
+      readr::write_csv(out, file)
+    })
+  output$ab_dl_fld <- downloadHandler(
+    filename = function() paste0("ab_field_agreement_", ab_stamp(), ".csv"),
+    content = function(file) {
+      r <- ab_rv$res
+      readr::write_csv(if (is.null(r)) data.frame() else r$fld_tbl, file)
+    })
+  output$ab_dl_aud <- downloadHandler(
+    filename = function() paste0("ab_quality_audit_", ab_stamp(), ".csv"),
+    content = function(file) {
+      r <- ab_rv$res
+      readr::write_csv(if (is.null(r)) data.frame() else r$aud, file)
+    })
 }
 
 shinyApp(ui = ui, server = server)
