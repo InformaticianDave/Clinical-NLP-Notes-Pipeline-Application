@@ -2904,6 +2904,87 @@ ui <- fluidPage(
       )
     ),
     nav_panel(
+      "Gold-Standard Adjudication",
+      div(class = "section-card",
+          div(class = "section-title", "Load rows to review"),
+          div(style = "font-size:0.75rem;color:#8b949e;margin-bottom:10px;",
+              "Reviewing the disagreement/no-call rows from a comparison is the cheap, sufficient way to rank two models. A sample of concordant rows, reviewed separately, is what catches an error the models share \u2014 upload one as a file here if you want that too."),
+          radioButtons("adj_source", NULL, choices = c(
+                         "From the last Model A/B run (disagreements)" = "ab_run",
+                         "Upload a file" = "upload"), selected = "ab_run"),
+          uiOutput("adj_source_status"),
+          conditionalPanel(
+            condition = "input.adj_source == 'upload'",
+            fileInput("adj_file", NULL, accept = c(".csv", ".xlsx", ".xls", ".txt"),
+                      buttonLabel = "Browse", placeholder = "No file"),
+            div(style = "font-size:0.72rem;color:#8b949e;margin-bottom:6px;",
+                "Multi-sheet Excel files use the first sheet \u2014 save as CSV first if that is not the one you want."),
+            uiOutput("adj_keycol_ui")
+          )
+      ),
+      div(class = "section-card",
+          div(class = "section-title", "Who's reviewing"),
+          fluidRow(
+            column(6, textInput("adj_reviewer", "Your name or initials", value = "", width = "100%")),
+            column(6, div(style = "padding-top:28px;",
+                         checkboxInput("adj_skip_labeled",
+                                      "Skip rows I've already adjudicated when I hit Next",
+                                      value = TRUE)))
+          ),
+          div(style = "font-size:0.72rem;color:#8b949e;",
+              "Each reviewer's calls are kept separately by name, so a second clinician can adjudicate the same rows independently \u2014 see Progress below for where you disagree with each other.")
+      ),
+      div(class = "section-card",
+          div(class = "section-title", "Review"),
+          fluidRow(
+            column(8, uiOutput("adj_row_ui")),
+            column(4,
+                   div(class = "form-label", "Jump to row"),
+                   selectInput("adj_jump", NULL, choices = character(0), width = "100%"),
+                   div(style = "display:flex;gap:8px;margin-top:4px;margin-bottom:10px;",
+                       actionButton("adj_prev", "\u2190 Prev",
+                                   style = "font-family:'IBM Plex Mono';font-size:0.72rem;"),
+                       actionButton("adj_next", "Next \u2192",
+                                   style = "font-family:'IBM Plex Mono';font-size:0.72rem;")),
+                   hr(class = "divider-line"),
+                   div(class = "form-label", "Adjudicated call"),
+                   radioButtons("adj_call", NULL, choices = c(
+                                  "Positive" = "positive", "Negative" = "negative",
+                                  "Uncertain / cannot determine" = "uncertain")),
+                   textAreaInput("adj_notes", "Rationale (optional)", rows = 3, width = "100%"),
+                   actionButton("adj_save", "Save & next", class = "btn btn-primary",
+                               style = "font-family:'IBM Plex Mono';font-size:0.75rem;width:100%;")
+            )
+          )
+      ),
+      div(class = "section-card",
+          div(class = "section-title", "Progress & inter-rater agreement"),
+          uiOutput("adj_progress_ui"),
+          conditionalPanel(
+            condition = "output.adj_has_conflicts",
+            div(style = "margin-top:10px;",
+                div(class = "form-label", "Rows where reviewers disagree"),
+                DT::dataTableOutput("adj_conflicts_table")))
+      ),
+      div(class = "section-card",
+          div(class = "section-title", "Export"),
+          div(style = "display:flex;flex-wrap:wrap;gap:10px;align-items:center;",
+              downloadButton("adj_dl_all", "Download all adjudications (long format)",
+                             class = "btn btn-outline-secondary",
+                             style = "font-family:'IBM Plex Mono';font-size:0.75rem;"),
+              downloadButton("adj_dl_gold", "Download consensus gold-standard CSV",
+                             class = "btn btn-primary",
+                             style = "font-family:'IBM Plex Mono';font-size:0.75rem;")),
+          div(style = "font-size:0.72rem;color:#8b949e;margin-top:10px;line-height:1.6;",
+              "The consensus file has one row per note: ", tags$code("row_key"), " + ", tags$code("gold_call"),
+              ", plus how many reviewers scored it and whether they agreed. Rows marked CONFLICT need a ",
+              "third opinion before they can be used as ground truth.",
+              tags$br(),
+              "Upload that file as the gold file back in the Model A/B tab (Scoring mode \u2192 \u2018gold\u2019) ",
+              "to score both models against it automatically \u2014 it is matched on the same row key, no manual merge needed.")
+      )
+    ),
+    nav_panel(
       "Load / Resume",
       div(class = "section-card",
           div(class = "section-title", "Resume / Load from File"),
@@ -3911,7 +3992,15 @@ server <- function(input, output, session) {
       selectInput("ab_gold_col", label = NULL, choices = ch,
                   selected = if (length(guess) > 0) ch[[guess[1]]] else NULL, width = "100%"),
       div(style = "font-size:0.72rem;color:#8b949e;",
-          "The human label. Uses the same positive values as above. Rows where this is blank are left out of the scored denominator.")
+          "The human label. Uses the same positive values as above. Rows where this is blank are left out of the scored denominator."),
+      hr(class = "divider-line"),
+      div(class = "form-label", "...or upload a gold CSV from the Adjudication tab"),
+      fileInput("ab_gold_file", NULL, accept = c(".csv", ".xlsx", ".xls"),
+                buttonLabel = "Browse", placeholder = "No file"),
+      div(style = "font-size:0.72rem;color:#8b949e;",
+          "Exported by the Gold-Standard Adjudication tab: a ", tags$code("row_key"), " + ",
+          tags$code("gold_call"), " column. Matched automatically on the same row key used for this ",
+          "comparison, so no manual merge is needed \u2014 overrides the column picked above when a file is attached.")
     )
   })
 
@@ -4025,7 +4114,7 @@ server <- function(input, output, session) {
       stringsAsFactors = FALSE)
 
     mode <- input$ab_mode %||% "agree"
-    met_tbl <- NULL; gold_vec <- NULL; mode_note <- NULL
+    met_tbl <- NULL; gold_vec <- NULL; gc_label <- NULL; mode_note <- NULL
     if (identical(mode, "ref_a")) {
       met_tbl <- mk_row(lb, paste0(la, " (nominated reference)"), ab_binary_metrics(pa, pb))
       mode_note <- sprintf("%s is treated as the reference. These are agreement-relative figures, not validated accuracy \u2014 a shared error in both models cannot appear here.", la)
@@ -4033,19 +4122,37 @@ server <- function(input, output, session) {
       met_tbl <- mk_row(la, paste0(lb, " (nominated reference)"), ab_binary_metrics(pb, pa))
       mode_note <- sprintf("%s is treated as the reference. These are agreement-relative figures, not validated accuracy \u2014 a shared error in both models cannot appear here.", lb)
     } else if (identical(mode, "gold")) {
-      gc <- input$ab_gold_col
-      if (is.null(gc) || !(gc %in% names(joined))) {
-        ab_rv$err <- "Pick a gold-standard column."; return()
+      # A gold file exported by the Adjudication tab carries its own row_key,
+      # built from the exact same join-key paste used here, so it matches
+      # without the user doing a manual VLOOKUP/merge first.
+      gf <- input$ab_gold_file
+      if (!is.null(gf)) {
+        gdf <- tryCatch(as.data.frame(ab_read_file(gf$datapath, gf$name), stringsAsFactors = FALSE),
+                        error = function(e) NULL)
+        if (is.null(gdf) || !("row_key" %in% names(gdf))) {
+          ab_rv$err <- "The uploaded gold file needs a 'row_key' column, matching the Adjudication tab's export."
+          return()
+        }
+        gcol <- if ("gold_call" %in% names(gdf)) "gold_call" else setdiff(names(gdf), "row_key")[1]
+        m <- match(joined$row_key, as.character(gdf$row_key))
+        gold_vec <- ab_to_logical(gdf[[gcol]][m], pos)
+        gc_label <- paste0("uploaded gold file (", gf$name, ")")
+      } else {
+        gc <- input$ab_gold_col
+        if (is.null(gc) || !(gc %in% names(joined))) {
+          ab_rv$err <- "Pick a gold-standard column, or upload a gold file."; return()
+        }
+        gold_vec <- ab_to_logical(joined[[gc]], pos)
+        gc_label <- gc
       }
-      gold_vec <- ab_to_logical(joined[[gc]], pos)
       if (sum(!is.na(gold_vec)) == 0) {
-        ab_rv$err <- sprintf("Gold column '%s' has no usable values on the matched rows.", gc); return()
+        ab_rv$err <- sprintf("Gold column/file '%s' has no usable values on the matched rows.", gc_label); return()
       }
       met_tbl <- rbind(
-        mk_row(la, paste0(gc, " (gold)"), ab_binary_metrics(gold_vec, pa)),
-        mk_row(lb, paste0(gc, " (gold)"), ab_binary_metrics(gold_vec, pb)))
+        mk_row(la, paste0(gc_label, " (gold)"), ab_binary_metrics(gold_vec, pa)),
+        mk_row(lb, paste0(gc_label, " (gold)"), ab_binary_metrics(gold_vec, pb)))
       mode_note <- sprintf("Both models scored against %s. These are true accuracy figures for the rows where the gold column is filled in (n = %d).",
-                           gc, sum(!is.na(gold_vec)))
+                           gc_label, sum(!is.na(gold_vec)))
     } else {
       mode_note <- "Agreement only. No ground truth was supplied, so no precision or recall is reported \u2014 see the quality audit below for the checks that do not need one."
     }
@@ -4113,7 +4220,7 @@ server <- function(input, output, session) {
       pct_agree = if (n_both > 0) n_agree / n_both else NA_real_,
       kappa = kap, mc = mc,
       met_tbl = met_tbl, fld_tbl = fld_tbl, aud = aud, dis = dis,
-      hall_a = hall_a, hall_b = hall_b,
+      hall_a = hall_a, hall_b = hall_b, gold_col_label = gc_label,
       preset = pk, model_cols = model_cols, joined = joined)
 
     log_add(sprintf("A/B comparison: %d matched rows \u2014 %.1f%% agreement, kappa %s",
@@ -4328,7 +4435,7 @@ server <- function(input, output, session) {
       file_a = if (!is.null(input$ab_file_a)) input$ab_file_a$name else "(unknown)",
       file_b = if (!is.null(input$ab_file_b)) input$ab_file_b$name else "(unknown)",
       key_desc = key_desc,
-      gold_col = if (identical(r$mode, "gold")) input$ab_gold_col else NULL,
+      gold_col = if (identical(r$mode, "gold")) (r$gold_col_label %||% input$ab_gold_col) else NULL,
       max_dis = md)
   }
 
@@ -4411,6 +4518,280 @@ server <- function(input, output, session) {
     content = function(file) {
       r <- ab_rv$res
       readr::write_csv(if (is.null(r)) data.frame() else r$aud, file)
+    })
+
+  # ===========================================================================
+  # GOLD-STANDARD ADJUDICATION
+  # Turns a Model A/B run's disagreement list (or an uploaded file) into a
+  # row-by-row review workflow with independent per-reviewer records, so a
+  # true accuracy figure -- not just agreement between two models -- becomes
+  # possible via the Model A/B tab's gold-scoring mode. row_key here is the
+  # exact same paste'd key string the A/B tab builds, so a gold file exported
+  # from here matches straight back onto that tab's data with no extra join.
+  # ===========================================================================
+
+  adj_rv <- reactiveValues(
+    rows = NULL, idx = 1,
+    labels = data.frame(row_key = character(0), reviewer = character(0),
+                        call = character(0), notes = character(0),
+                        timestamp = character(0), stringsAsFactors = FALSE))
+
+  adj_upload_df <- reactive({
+    fi <- input$adj_file; req(fi)
+    tryCatch(as.data.frame(ab_read_file(fi$datapath, fi$name), stringsAsFactors = FALSE),
+             error = function(e) NULL)
+  })
+
+  output$adj_keycol_ui <- renderUI({
+    df <- adj_upload_df()
+    if (is.null(df))
+      return(div(style = "color:#f85149;font-size:0.75rem;", "Could not read this file."))
+    nms <- names(df)
+    guess <- if ("row_key" %in% nms) "row_key" else nms[1]
+    div(
+      div(class = "form-label", "Which column uniquely identifies each row?"),
+      selectInput("adj_key_col", NULL, choices = nms, selected = guess, width = "100%"),
+      div(style = "font-size:0.72rem;color:#8b949e;",
+          "A column named NOTE_TEXT, and columns containing \u2018[A]\u2019/\u2018[B]\u2019 or starting \u2018A: \u2019/\u2018B: \u2019, are shown automatically; everything else is listed as-is.")
+    )
+  })
+
+  adj_source_rows <- reactive({
+    if (identical(input$adj_source %||% "ab_run", "ab_run")) {
+      r <- ab_rv$res
+      if (is.null(r) || is.null(r$dis) || nrow(r$dis) == 0) return(NULL)
+      r$dis
+    } else {
+      df <- adj_upload_df()
+      kc <- input$adj_key_col
+      if (is.null(df) || is.null(kc) || !(kc %in% names(df))) return(NULL)
+      names(df)[names(df) == kc] <- "row_key"
+      df$row_key <- as.character(df$row_key)
+      df
+    }
+  })
+
+  observeEvent(adj_source_rows(), {
+    adj_rv$rows <- adj_source_rows()
+    adj_rv$idx <- 1
+  }, ignoreNULL = FALSE)
+
+  observeEvent(adj_rv$rows, {
+    rows <- adj_rv$rows
+    choices <- if (is.null(rows) || nrow(rows) == 0) character(0)
+               else stats::setNames(seq_len(nrow(rows)),
+                                    sprintf("%d: %s", seq_len(nrow(rows)), rows$row_key))
+    updateSelectInput(session, "adj_jump", choices = choices,
+                      selected = if (length(choices) > 0) choices[[1]] else NULL)
+  })
+
+  output$adj_source_status <- renderUI({
+    if (identical(input$adj_source %||% "ab_run", "ab_run")) {
+      r <- ab_rv$res
+      if (is.null(r))
+        return(div(style = "font-size:0.75rem;color:#d29922;",
+                   "No comparison has been run yet in this session. Run one in the Model A/B tab, then come back here."))
+      n <- if (is.null(r$dis)) 0 else nrow(r$dis)
+      if (n == 0)
+        return(div(style = "font-size:0.75rem;color:#3fb950;",
+                   "The last run had no disagreements or missing calls \u2014 nothing to adjudicate."))
+      div(style = "font-size:0.75rem;color:#3fb950;",
+          sprintf("\u2713 %d disagreement/no-call row(s) loaded from the last comparison (%s vs %s).",
+                  n, r$la, r$lb))
+    } else {
+      rows <- adj_source_rows()
+      if (is.null(rows))
+        div(style = "font-size:0.75rem;color:#8b949e;", "Upload a file and pick the row-key column.")
+      else
+        div(style = "font-size:0.75rem;color:#3fb950;", sprintf("\u2713 %d row(s) loaded.", nrow(rows)))
+    }
+  })
+
+  observeEvent(input$adj_jump, {
+    i <- suppressWarnings(as.integer(input$adj_jump))
+    if (!is.na(i)) adj_rv$idx <- i
+  }, ignoreInit = TRUE)
+
+  observeEvent(input$adj_prev, { adj_rv$idx <- max(1, adj_rv$idx - 1) })
+
+  observeEvent(input$adj_next, {
+    rows <- adj_rv$rows
+    if (is.null(rows) || nrow(rows) == 0) return()
+    adj_rv$idx <- min(nrow(rows), adj_rv$idx + 1)
+  })
+
+  # Preload the current reviewer's existing answer for the row in view, so
+  # re-visiting a row (or switching reviewer name) never looks blank-by-default
+  # when it was actually already adjudicated.
+  observe({
+    rows <- adj_rv$rows
+    if (is.null(rows) || nrow(rows) == 0) return()
+    i <- max(1, min(adj_rv$idx, nrow(rows)))
+    rk <- rows$row_key[i]
+    rev <- trimws(input$adj_reviewer %||% "")
+    lb <- adj_rv$labels
+    hit <- lb[lb$row_key == rk & lb$reviewer == rev, , drop = FALSE]
+    if (nrow(hit) > 0) {
+      updateRadioButtons(session, "adj_call", selected = hit$call[nrow(hit)])
+      updateTextAreaInput(session, "adj_notes", value = hit$notes[nrow(hit)])
+    } else {
+      updateRadioButtons(session, "adj_call", selected = character(0))
+      updateTextAreaInput(session, "adj_notes", value = "")
+    }
+  })
+
+  adj_render_row <- function(row) {
+    cols <- names(row)
+    note_col <- intersect(c("NOTE_TEXT"), cols)
+    a_cols <- cols[grepl("\\[A\\]|^A: ", cols)]
+    b_cols <- cols[grepl("\\[B\\]|^B: ", cols)]
+    other <- setdiff(cols, c("row_key", note_col, a_cols, b_cols))
+    kv <- function(cols_) {
+      if (length(cols_) == 0) return(div(style = "font-size:0.72rem;color:#8b949e;", "(none)"))
+      tagList(lapply(cols_, function(cn) {
+        v <- row[[cn]]
+        div(style = "margin-bottom:5px;",
+            tags$b(style = "color:#8b949e;font-size:0.68rem;",
+                  paste0(sub("^A: |^B: ", "", cn), ": ")),
+            tags$span(style = "font-size:0.78rem;",
+                      if (is.null(v) || (length(v) == 1 && is.na(v))) "\u2014" else as.character(v)))
+      }))
+    }
+    tagList(
+      div(style = "font-size:0.72rem;color:#8b949e;margin-bottom:6px;",
+          paste("Row key:", row$row_key)),
+      if (length(note_col) > 0)
+        div(style = "white-space:pre-wrap;max-height:260px;overflow-y:auto;background:#0d1117;border:1px solid #30363d;border-radius:6px;padding:10px;font-size:0.78rem;margin-bottom:10px;",
+            as.character(row[[note_col]])),
+      fluidRow(
+        column(6, div(style = "font-weight:600;font-size:0.72rem;color:#58a6ff;margin-bottom:4px;", "MODEL A"), kv(a_cols)),
+        column(6, div(style = "font-weight:600;font-size:0.72rem;color:#d29922;margin-bottom:4px;", "MODEL B"), kv(b_cols))
+      ),
+      if (length(other) > 0) tagList(hr(class = "divider-line"), kv(other))
+    )
+  }
+
+  output$adj_row_ui <- renderUI({
+    rows <- adj_rv$rows
+    if (is.null(rows) || nrow(rows) == 0)
+      return(div(style = "font-size:0.8rem;color:#8b949e;",
+                "No rows loaded. Run a Model A/B comparison that has disagreements, or upload a file above."))
+    i <- max(1, min(adj_rv$idx, nrow(rows)))
+    tagList(
+      div(style = "font-size:0.75rem;color:#8b949e;margin-bottom:8px;",
+          sprintf("Row %d of %d", i, nrow(rows))),
+      adj_render_row(rows[i, , drop = FALSE])
+    )
+  })
+
+  observeEvent(input$adj_save, {
+    rows <- adj_rv$rows
+    if (is.null(rows) || nrow(rows) == 0) return()
+    rev <- trimws(input$adj_reviewer %||% "")
+    if (!nzchar(rev)) {
+      showNotification("Enter your name or initials before saving.", type = "error"); return()
+    }
+    i <- max(1, min(adj_rv$idx, nrow(rows)))
+    rk <- rows$row_key[i]
+    rec <- data.frame(row_key = rk, reviewer = rev, call = input$adj_call %||% "uncertain",
+                      notes = trimws(input$adj_notes %||% ""),
+                      timestamp = format(Sys.time(), "%Y-%m-%d %H:%M:%S"),
+                      stringsAsFactors = FALSE)
+    lb <- adj_rv$labels
+    dup <- which(lb$row_key == rk & lb$reviewer == rev)
+    if (length(dup) > 0) lb[dup[1], ] <- rec else lb <- rbind(lb, rec)
+    adj_rv$labels <- lb
+    log_add(sprintf("Adjudicated row %s as %s (%s).", rk, rec$call, rev))
+
+    n <- nrow(rows); nxt <- i
+    if (isTRUE(input$adj_skip_labeled)) {
+      labeled <- lb$row_key[lb$reviewer == rev]
+      repeat {
+        nxt <- nxt + 1
+        if (nxt > n || !(rows$row_key[nxt] %in% labeled)) break
+      }
+    } else {
+      nxt <- nxt + 1
+    }
+    adj_rv$idx <- min(nxt, n)
+  })
+
+  output$adj_progress_ui <- renderUI({
+    rows <- adj_rv$rows; lb <- adj_rv$labels
+    if (is.null(rows) || nrow(rows) == 0)
+      return(div(style = "font-size:0.75rem;color:#8b949e;", "No rows loaded yet."))
+    lb <- lb[lb$row_key %in% rows$row_key, , drop = FALSE]
+    reviewers <- unique(lb$reviewer)
+    by_row <- if (nrow(lb) > 0) split(lb, lb$row_key) else list()
+    multi <- by_row[sapply(by_row, function(d) length(unique(d$reviewer)) >= 2)]
+    n_conflict <- sum(sapply(multi, function(d) length(unique(d$call)) > 1))
+    tagList(
+      div(style = "display:flex;flex-wrap:wrap;gap:12px;",
+          ab_tile("Rows loaded", format(nrow(rows), big.mark = ",")),
+          ab_tile("Reviewers", if (length(reviewers) == 0) "0" else paste(reviewers, collapse = ", ")),
+          ab_tile("Adjudicated (any reviewer)", format(length(unique(lb$row_key)), big.mark = ",")),
+          ab_tile("Rows with \u22652 reviewers", format(length(multi), big.mark = ",")),
+          ab_tile("Conflicting calls", as.character(n_conflict),
+                  "need a third opinion", accent = if (n_conflict > 0) "#f85149" else "#3fb950")
+      )
+    )
+  })
+
+  output$adj_has_conflicts <- reactive({
+    rows <- adj_rv$rows; lb <- adj_rv$labels
+    if (is.null(rows) || nrow(rows) == 0 || nrow(lb) == 0) return(FALSE)
+    lb <- lb[lb$row_key %in% rows$row_key, , drop = FALSE]
+    by_row <- split(lb, lb$row_key)
+    multi <- by_row[sapply(by_row, function(d) length(unique(d$reviewer)) >= 2)]
+    any(sapply(multi, function(d) length(unique(d$call)) > 1))
+  })
+  outputOptions(output, "adj_has_conflicts", suspendWhenHidden = FALSE)
+
+  output$adj_conflicts_table <- DT::renderDataTable({
+    rows <- adj_rv$rows; lb <- adj_rv$labels
+    req(rows); req(nrow(lb) > 0)
+    lb <- lb[lb$row_key %in% rows$row_key, , drop = FALSE]
+    by_row <- split(lb, lb$row_key)
+    multi <- by_row[sapply(by_row, function(d) length(unique(d$reviewer)) >= 2)]
+    conf <- multi[sapply(multi, function(d) length(unique(d$call)) > 1)]
+    if (length(conf) == 0) return(ab_dt(data.frame(note = "No conflicts.")))
+    out <- do.call(rbind, lapply(names(conf), function(rk) {
+      d <- conf[[rk]]
+      data.frame(row_key = rk,
+                reviewer = paste(d$reviewer, collapse = " / "),
+                call = paste(d$call, collapse = " / "),
+                stringsAsFactors = FALSE)
+    }))
+    ab_dt(out, page = 10)
+  })
+
+  output$adj_dl_all <- downloadHandler(
+    filename = function() paste0("adjudications_all_", ab_stamp(), ".csv"),
+    content = function(file) {
+      lb <- adj_rv$labels
+      readr::write_csv(if (is.null(lb)) data.frame() else lb, file)
+    })
+
+  output$adj_dl_gold <- downloadHandler(
+    filename = function() paste0("gold_standard_consensus_", ab_stamp(), ".csv"),
+    content = function(file) {
+      lb <- adj_rv$labels
+      if (is.null(lb) || nrow(lb) == 0) {
+        readr::write_csv(data.frame(row_key = character(0), gold_call = character(0),
+                                    n_reviewers = integer(0), agreement = character(0)), file)
+        return()
+      }
+      by_row <- split(lb, lb$row_key)
+      out <- do.call(rbind, lapply(names(by_row), function(rk) {
+        d <- by_row[[rk]]
+        calls <- unique(d$call)
+        gold <- if (length(calls) == 1) calls[1] else NA_character_
+        data.frame(row_key = rk, gold_call = gold,
+                  n_reviewers = length(unique(d$reviewer)),
+                  agreement = if (length(calls) == 1) "consensus" else "CONFLICT \u2014 needs a third opinion",
+                  stringsAsFactors = FALSE)
+      }))
+      readr::write_csv(out, file)
     })
 }
 
