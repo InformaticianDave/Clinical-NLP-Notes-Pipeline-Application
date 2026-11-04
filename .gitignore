@@ -90,3 +90,22 @@ desktop.ini
 *.swp
 .vscode/
 .idea/
+
+# =============================================================================
+# Additional rules from GitHub's R template
+# =============================================================================
+.RData
+.RDataTmp
+*-Ex.R
+/*.tar.gz
+/*.Rcheck/
+vignettes/*.html
+vignettes/*.pdf
+*_cache/
+/cache/
+*.utf8.md
+*.knit.md
+po/*~
+rsconnect/
+# NB: the R template's "docs/" rule is deliberately omitted — that is for
+# pkgdown output, and docs/ here holds tracked documentation.

@@ -182,7 +182,14 @@ reported accuracy is the accuracy of a reproducible pipeline.
 
 ## Licence
 
-No licence has been chosen yet. Until one is added, default copyright applies
-and others have no right to reuse this code. If the work is published, pick a
-licence that is compatible with institutional policy before making the
-repository public.
+GNU Affero General Public License v3.0. See `LICENSE`.
+
+AGPL-3.0 is the strongest copyleft in common use: anyone who modifies this code
+and makes it available over a network — a hosted Shiny app counts — must publish
+their modified source under the same licence. That is usually the intent for
+published academic methods work, and it is worth being deliberate about, because
+it also means a commercial vendor cannot quietly build a closed product on top
+of it.
+
+Confirm the choice is compatible with institutional IP policy before the methods
+paper goes out.
