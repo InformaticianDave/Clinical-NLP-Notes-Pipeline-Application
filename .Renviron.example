@@ -1,0 +1,22 @@
+# Copy this file to .Renviron (which is gitignored) and fill in your own values.
+#
+# The committed defaults in DEFAULT_DB_CONFIG and DEFAULT_VERTEX_CONFIG, near
+# the top of app/Vertex_NLP_Shiny_App.R, are placeholders. Put your real values
+# here, or edit those constants locally and never commit the change.
+
+# --- SQL Server (Epic Clarity) -----------------------------------------------
+NICU_DB_SERVER=your-sql-server.example.org
+NICU_DB_PORT=1433
+NICU_DB_DATABASE=Clarity
+
+# --- Google Cloud / Vertex AI ------------------------------------------------
+# Authentication itself uses the gcloud CLI:
+#   gcloud auth application-default login
+# so no key material belongs in this file.
+NICU_GCP_PROJECT=your-gcp-project-id
+NICU_GCP_LOCATION=us-central1
+NICU_GCP_MODEL=gemini-2.5-flash
+
+# --- LM Studio (local, for PHI-containing work) ------------------------------
+NICU_LM_BASE_URL=http://localhost:1234/v1
+NICU_LM_MODEL=biomistral
