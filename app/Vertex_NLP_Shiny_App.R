@@ -4135,7 +4135,13 @@ server <- function(input, output, session) {
         }
         gcol <- if ("gold_call" %in% names(gdf)) "gold_call" else setdiff(names(gdf), "row_key")[1]
         m <- match(joined$row_key, as.character(gdf$row_key))
-        gold_vec <- ab_to_logical(gdf[[gcol]][m], pos)
+        # The Adjudication tab writes positive / negative / uncertain, which are
+        # not in the user's "positive values" list (true,yes,1). Without this,
+        # every adjudicated positive would silently score as a negative.
+        # "uncertain" is a refusal to call, so it is left out, not scored as 0.
+        gold_raw <- gdf[[gcol]][m]
+        gold_vec <- ab_to_logical(gold_raw, c(pos, "positive"))
+        gold_vec[ab_norm(gold_raw) %in% c("uncertain", "conflict")] <- NA
         gc_label <- paste0("uploaded gold file (", gf$name, ")")
       } else {
         gc <- input$ab_gold_col
