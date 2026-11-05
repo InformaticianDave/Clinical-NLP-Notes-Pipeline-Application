@@ -9,7 +9,63 @@ of the captured artefacts. The first two entries predate the available record,
 and their dates are approximate — the *order* is correct, the exact days are
 not.
 
+The four 2026-11-05 entries were developed in one sitting and split into
+separate commits afterwards, one per logical change. Each resulting commit was
+checked to parse and to contain only its own feature, so the history is
+reviewable change by change; the timestamps within that day are therefore
+ordering, not a record of when each line was typed.
+
 ---
+
+## Missing-confidence crash fix — 2026-11-05
+
+- Fixed a note whose JSON omitted `confidence` aborting the entire extraction
+  run with `argument is of length zero`. `as.numeric(NULL)` is `numeric(0)`, so
+  `is.na()` returned `logical(0)` and `if()` threw on a zero-length condition.
+  Absent, empty, list-wrapped and non-numeric confidence are now all read as
+  `review_no_conf`.
+- Review-status computation is wrapped per row. A failure marks that one row
+  `failed_status`, writes the reason to `extract_error` and lets the run
+  continue, rather than escaping the row loop and losing everything since the
+  last autosave.
+- If a preset lacks `present_true`, fall back to the usual truthy set rather
+  than silently marking every row `exclude_absent` — a clean-looking run full
+  of fabricated negatives is worse than a crash, because nothing alerts you.
+- **New `review_status` value: `failed_status`.** Downstream filters that
+  enumerate statuses explicitly need to account for it.
+
+## Hardware and live-request monitoring — 2026-11-05
+
+- Usage & Cost gained a panel showing GPU load, VRAM, temperature and power
+  (via `nvidia-smi`, every 3s) plus CPU and system RAM, read per platform and
+  degrading to `NA` rather than erroring where a tool is missing or blocked.
+- Recent-requests table: time, source, prompt/output tokens, duration and
+  tok/s for every pipeline call and chat message, capped at 200 rows.
+- These figures describe the machine running the app, so they are meaningful
+  only on the LM Studio backend; Vertex calls run in Google's datacenter. The
+  panel states this rather than implying local GPU use.
+
+## Chat tab — 2026-11-05
+
+- Free-form, multi-turn conversation with whichever backend and model Config
+  has active, for testing a prompt or confirming a model/location combination
+  answers at all before committing it to a run.
+- `call_gemini_chat()` / `call_lmstudio_chat()` are separate from the
+  extraction callers, which force JSON output and a response schema — wrong
+  for a conversation. Full turn history is resent each call, since neither API
+  keeps server-side state.
+- Nothing is written to disk; the thread resets on reload.
+
+## Vertex endpoint location fix — 2026-11-05
+
+- Fixed HTTP 404 `NOT_FOUND` on every Gemini model not served from
+  `us-central1`. The error names the model, but the cause is the endpoint
+  shape: Vertex's global endpoint is **not** region-prefixed
+  (`aiplatform.googleapis.com`), while regional ones are
+  (`{location}-aiplatform.googleapis.com`). `call_gemini()` built the regional
+  hostname unconditionally, so `global` could never resolve.
+- Default location changed from `us-central1` to `global`, which serves every
+  current Gemini model. Config notes that regional endpoints serve a subset.
 
 ## Gold-call mapping fix — 2026-11-04
 

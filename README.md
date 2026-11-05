@@ -21,7 +21,18 @@ at a real server, project or dataset:
 |---|---|
 | `DEFAULT_DB_CONFIG$server` | `your-sql-server.example.org` |
 | `DEFAULT_VERTEX_CONFIG$project` | `your-gcp-project-id` |
+| `DEFAULT_VERTEX_CONFIG$location` | `global` |
 | `DEFAULT_LM_CONFIG$base_url` | `http://localhost:1234/v1` |
+
+### A note on `location`
+
+Leave it at `global` unless you have a reason not to. Vertex serves every
+current Gemini model from the global endpoint, but a regional endpoint such as
+`us-central1` serves only a subset — and asking a region for a model it does
+not host returns `404 NOT_FOUND` naming the *model*, which reads like a typo or
+a permissions problem rather than a location problem. The two endpoints also
+have different URL shapes (global is not region-prefixed), which the app
+handles for you.
 
 Set your real values locally and keep them out of version control. The supported
 way is a `.Renviron` file, which `.gitignore` excludes — copy `.Renviron.example`
@@ -102,6 +113,27 @@ That gold file uploads back into the A/B tab, which converts the comparison from
 *agreement between two models* into *measured accuracy against chart review*.
 The distinction matters: two models that share a blind spot agree perfectly.
 
+### 4. Chat
+
+A free-form, multi-turn conversation with whichever backend and model are
+active. It uses no output schema, so replies come back as prose. Useful for
+trying a prompt before wiring it into a preset, or for confirming a model and
+location combination answers at all before starting a run against it. Nothing
+is written to disk and the thread resets on reload.
+
+### 5. Usage, cost and hardware
+
+Token counts, duration and estimated cost per run, driven by a model price
+catalogue. Alongside it, a live panel reads GPU load, VRAM, temperature and
+power from `nvidia-smi`, plus CPU and system RAM, and lists recent requests
+with their duration and tok/s.
+
+The hardware figures describe the machine running the app. They are therefore
+meaningful on the LM Studio backend and not on Vertex, whose calls execute in
+Google's datacenter while the local GPU sits idle. Where a reading is
+unavailable — no `nvidia-smi`, WMI blocked — the tile shows `—` rather than
+failing.
+
 ---
 
 ## Requirements
@@ -175,6 +207,14 @@ reported accuracy is the accuracy of a reproducible pipeline.
   absolute accuracy, because rows where both models agreed are never checked.
   A sample of concordant rows is needed for that.
 - Adjudications live in memory for the session. Export before closing the app.
+  The same applies to the Chat thread and the recent-requests table.
+- `review_status` can be `failed_status`: the row's JSON parsed, but computing
+  its status errored, and `extract_error` holds the reason. It is rare, but any
+  downstream query that enumerates statuses explicitly must account for it, or
+  those rows will silently fall outside every bucket.
+- Chat rows in the request table approximate token counts from character
+  length, because the chat path does not parse `usageMetadata`. Pipeline rows
+  carry the real counts. Do not mix the two in a cost calculation.
 - Generation is not fully deterministic even at temperature 0, so part of any
   observed disagreement is run-to-run variation.
 
