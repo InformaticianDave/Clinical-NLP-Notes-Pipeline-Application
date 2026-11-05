@@ -1130,6 +1130,122 @@ call_llm <- function(prompt, provider, gcp_token, vertex_cfg, lm_cfg, schema) {
   } else {
     call_lmstudio(prompt, lm_cfg$base_url, lm_cfg$model)
   }
+# =============================================================================
+# CHAT TAB — free-form, multi-turn, no response schema.
+#
+# Separate from call_gemini()/call_lmstudio() above on purpose: those force
+# responseMimeType = "application/json" (and, for Vertex, a responseSchema),
+# which is exactly wrong for a conversation where the model should answer in
+# plain prose. These two functions take the full turn history (list of
+# list(role = "user"/"assistant", text = ...)) and send it as one multi-turn
+# request each time, since neither API keeps server-side conversation state.
+# =============================================================================
+
+call_gemini_chat <- function(history, token, ai_cfg) {
+  endpoint <- if (identical(ai_cfg$location, "global")) {
+    sprintf(
+      "https://aiplatform.googleapis.com/v1/projects/%s/locations/global/publishers/google/models/%s:generateContent",
+      ai_cfg$project, ai_cfg$model
+    )
+  } else {
+    sprintf(
+      "https://%s-aiplatform.googleapis.com/v1/projects/%s/locations/%s/publishers/google/models/%s:generateContent",
+      ai_cfg$location, ai_cfg$project, ai_cfg$location, ai_cfg$model
+    )
+  }
+
+  # Vertex's chat role for the model's own turns is "model", not "assistant".
+  contents <- lapply(history, function(turn) {
+    list(role = if (identical(turn$role, "user")) "user" else "model",
+         parts = list(list(text = turn$text)))
+  })
+
+  body <- list(
+    contents = contents,
+    generationConfig = list(temperature = 0.7, maxOutputTokens = 4096),
+    safetySettings = list(
+      list(category = "HARM_CATEGORY_HARASSMENT",        threshold = "BLOCK_NONE"),
+      list(category = "HARM_CATEGORY_HATE_SPEECH",       threshold = "BLOCK_NONE"),
+      list(category = "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold = "BLOCK_NONE"),
+      list(category = "HARM_CATEGORY_DANGEROUS_CONTENT", threshold = "BLOCK_NONE")
+    )
+  )
+
+  response <- tryCatch({
+    httr2::request(endpoint) |>
+      httr2::req_auth_bearer_token(token) |>
+      httr2::req_body_json(body) |>
+      httr2::req_timeout(120) |>
+      httr2::req_error(is_error = function(resp) FALSE) |>
+      httr2::req_perform()
+  }, error = function(e) NULL)
+
+  if (is.null(response))
+    return(list(text = NA_character_, reason = "NETWORK_CRASH"))
+
+  status <- httr2::resp_status(response)
+  if (status >= 400) {
+    err_body <- tryCatch(httr2::resp_body_string(response), error = function(e) "")
+    return(list(text = NA_character_, reason = sprintf("HTTP_ERROR_%d: %s", status, err_body)))
+  }
+
+  result <- tryCatch(httr2::resp_body_json(response), error = function(e) NULL)
+  if (is.null(result))
+    return(list(text = NA_character_, reason = "RESPONSE_NOT_JSON"))
+
+  if (!is.null(result$promptFeedback) && !is.null(result$promptFeedback$blockReason))
+    return(list(text = NA_character_, reason = paste0("PROMPT_BLOCKED_", result$promptFeedback$blockReason)))
+
+  if (is.null(result$candidates) || length(result$candidates) == 0)
+    return(list(text = NA_character_, reason = "NO_CANDIDATES"))
+
+  candidate <- result$candidates[[1]]
+  parts     <- candidate$content$parts
+  if (!is.null(parts) && length(parts) > 0 && !is.null(parts[[1]]$text)) {
+    txt <- parts[[1]]$text
+    if (nzchar(trimws(txt))) return(list(text = txt, reason = "ok"))
+  }
+  list(text = NA_character_, reason = paste0("EMPTY_CANDIDATE_", candidate$finishReason %||% "?"))
+}
+
+call_lmstudio_chat <- function(history, base_url, model) {
+  endpoint <- paste0(lm_base_url_clean(base_url), "/chat/completions")
+
+  messages <- lapply(history, function(turn) {
+    list(role = if (identical(turn$role, "user")) "user" else "assistant", content = turn$text)
+  })
+
+  body <- list(model = model, messages = messages, temperature = 0.7, max_tokens = 2048)
+
+  response <- tryCatch({
+    httr2::request(endpoint) |>
+      httr2::req_body_json(body) |>
+      httr2::req_timeout(180) |>
+      httr2::req_error(is_error = function(resp) FALSE) |>
+      httr2::req_perform()
+  }, error = function(e) NULL)
+
+  if (is.null(response))
+    return(list(text = NA_character_, reason = "NETWORK_CRASH"))
+
+  if (httr2::resp_status(response) >= 400) {
+    err_body <- tryCatch(httr2::resp_body_string(response), error = function(e) "")
+    return(list(text = NA_character_,
+                reason = sprintf("HTTP_ERROR_%d: %s", httr2::resp_status(response), err_body)))
+  }
+
+  result <- tryCatch(httr2::resp_body_json(response), error = function(e) NULL)
+  if (is.null(result))
+    return(list(text = NA_character_, reason = "RESPONSE_NOT_JSON"))
+
+  if (!is.null(result$choices) && length(result$choices) > 0) {
+    content <- result$choices[[1]]$message$content
+    if (!is.null(content) && nchar(trimws(content)) > 0)
+      return(list(text = content, reason = "ok"))
+  }
+  list(text = NA_character_, reason = "NO_CHOICES")
+}
+
 }
 
 clean_json_fence <- function(x) {
@@ -2794,6 +2910,32 @@ ui <- fluidPage(
       )
     ),
     nav_panel(
+      "Chat",
+      div(class = "section-card",
+          div(class = "section-title", "Chat \u2014 talk to the model directly"),
+          div(style = "font-size:0.75rem;color:#8b949e;margin-bottom:10px;",
+              "Uses whichever backend and model are set in Config, as a free-form conversation \u2014 no JSON schema, no pipeline. Good for testing a prompt idea or sanity-checking that a model/location combination actually works before wiring it into an extraction run. Nothing here is saved to disk, and the conversation resets if you reload the page."),
+          uiOutput("chat_history_ui"),
+          hr(class = "divider-line"),
+          fluidRow(
+            column(10, textAreaInput("chat_input", label = NULL, rows = 3, width = "100%",
+                                     placeholder = "Type a message... (Ctrl+Enter also sends)")),
+            column(2,
+                   div(style = "display:flex;flex-direction:column;gap:6px;height:100%;",
+                       actionButton("chat_send", "Send", class = "btn btn-primary w-100",
+                                    style = "font-family:'IBM Plex Mono';font-weight:700;"),
+                       actionButton("chat_clear", "Clear chat", class = "btn btn-outline-secondary w-100",
+                                    style = "font-family:'IBM Plex Mono';font-size:0.72rem;")))
+          ),
+          uiOutput("chat_status"),
+          tags$script(HTML("
+            $(document).on('keydown', '#chat_input', function(e) {
+              if (e.ctrlKey && e.key === 'Enter') { $('#chat_send').click(); }
+            });
+          "))
+      )
+    ),
+    nav_panel(
       "Usage & Cost",
       div(class = "section-card",
           div(class = "section-title", "Tokens, Duration & Estimated Cost"),
@@ -3070,6 +3212,77 @@ server <- function(input, output, session) {
     session$sendCustomMessage("update-progress", list(pct = pct))
   }
   observe({ update_progress_bar(rv$progress_i, rv$progress_n) })
+
+  # ── Chat tab ──
+  chat_rv <- reactiveValues(turns = list(), busy = FALSE)
+
+  output$chat_history_ui <- renderUI({
+    turns <- chat_rv$turns
+    if (length(turns) == 0)
+      return(div(style = "color:#8b949e;font-size:0.8rem;padding:10px 0;",
+                 "No messages yet \u2014 say something below."))
+    div(style = "max-height:420px;overflow-y:auto;padding:4px 2px;",
+        tagList(lapply(turns, function(t) {
+          is_user <- identical(t$role, "user")
+          is_err  <- identical(t$role, "error")
+          div(style = sprintf(
+                "margin-bottom:10px;padding:8px 12px;border-radius:8px;max-width:85%%;%s background:%s;",
+                if (is_user) "margin-left:auto;" else "margin-right:auto;",
+                if (is_err) "#da363322" else if (is_user) "#1f6feb22" else "#30363d55"
+              ),
+              div(style = "font-size:0.65rem;color:#8b949e;margin-bottom:3px;font-family:'IBM Plex Mono';text-transform:uppercase;letter-spacing:0.05em;",
+                  if (is_user) "You" else if (is_err) "Error" else "Model"),
+              div(style = "white-space:pre-wrap;font-size:0.85rem;line-height:1.5;", t$text))
+        })))
+  })
+
+  output$chat_status <- renderUI({
+    if (isTRUE(chat_rv$busy))
+      div(style = "font-size:0.75rem;color:#8b949e;margin-top:6px;", "Waiting for a response\u2026")
+    else NULL
+  })
+
+  observeEvent(input$chat_clear, {
+    chat_rv$turns <- list()
+  })
+
+  observeEvent(input$chat_send, {
+    msg <- trimws(input$chat_input %||% "")
+    if (msg == "" || isTRUE(chat_rv$busy)) return()
+
+    chat_rv$turns <- c(chat_rv$turns, list(list(role = "user", text = msg)))
+    updateTextAreaInput(session, "chat_input", value = "")
+    chat_rv$busy <- TRUE
+    on.exit(chat_rv$busy <- FALSE)
+
+    provider <- input$llm_provider %||% "lmstudio"
+
+    if (provider == "vertex" && !isTRUE(rv$gcp_ok)) {
+      chat_rv$turns <- c(chat_rv$turns, list(list(
+        role = "error",
+        text = "Not authenticated to Vertex AI \u2014 go to Config and click \u201cCheck LLM\u201d first (this runs gcloud auth application-default login under the hood if needed)."
+      )))
+      return()
+    }
+
+    result <- withProgress(message = "Waiting for model\u2026", value = 0.5, {
+      if (provider == "vertex") {
+        call_gemini_chat(chat_rv$turns, rv$gcp_token, build_vertex_cfg())
+      } else {
+        call_lmstudio_chat(chat_rv$turns, input$lm_base_url, input$lm_model_input)
+      }
+    })
+
+
+    if (!is.na(result$text)) {
+      chat_rv$turns <- c(chat_rv$turns, list(list(role = "assistant", text = result$text)))
+    } else {
+      chat_rv$turns <- c(chat_rv$turns, list(list(
+        role = "error",
+        text = paste0("Request failed: ", result$reason)
+      )))
+    }
+  })
 
   # ── Diagnosis preset switching ──
   observeEvent(input$diagnosis_preset, {
