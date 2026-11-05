@@ -1130,6 +1130,8 @@ call_llm <- function(prompt, provider, gcp_token, vertex_cfg, lm_cfg, schema) {
   } else {
     call_lmstudio(prompt, lm_cfg$base_url, lm_cfg$model)
   }
+}
+
 # =============================================================================
 # CHAT TAB — free-form, multi-turn, no response schema.
 #
@@ -1246,6 +1248,90 @@ call_lmstudio_chat <- function(history, base_url, model) {
   list(text = NA_character_, reason = "NO_CHOICES")
 }
 
+# =============================================================================
+# HARDWARE MONITORING — best-effort, for the Usage & Cost tab's live GPU/CPU
+# view. Everything here is read from the machine running the Shiny app itself,
+# via nvidia-smi and OS-specific system calls. It only means something when
+# the active backend is LM Studio (local): a Vertex AI call runs entirely in
+# Google's datacenter and this machine's GPU sits idle for it. Every read is
+# wrapped so a missing tool or a locked-down machine degrades to NA rather
+# than crashing the tab.
+# =============================================================================
+
+get_gpu_stats <- function() {
+  nv <- Sys.which("nvidia-smi")
+  if (!nzchar(nv)) return(NULL)
+  out <- tryCatch(
+    system2(nv, c("--query-gpu=utilization.gpu,memory.used,memory.total,temperature.gpu,power.draw,power.limit,name",
+                  "--format=csv,noheader,nounits"),
+            stdout = TRUE, stderr = FALSE),
+    error = function(e) NULL
+  )
+  if (is.null(out) || length(out) == 0 || !nzchar(out[1])) return(NULL)
+  parts <- trimws(strsplit(out[1], ",")[[1]])
+  if (length(parts) < 7) return(NULL)
+  list(
+    gpu_util_pct  = suppressWarnings(as.numeric(parts[1])),
+    vram_used_mb  = suppressWarnings(as.numeric(parts[2])),
+    vram_total_mb = suppressWarnings(as.numeric(parts[3])),
+    temp_c        = suppressWarnings(as.numeric(parts[4])),
+    power_w       = suppressWarnings(as.numeric(parts[5])),
+    power_limit_w = suppressWarnings(as.numeric(parts[6])),
+    name          = parts[7]
+  )
+}
+
+get_sys_stats <- function() {
+  sysname <- Sys.info()[["sysname"]]
+  cores   <- tryCatch(parallel::detectCores(logical = TRUE), error = function(e) NA_integer_)
+  cpu_pct <- NA_real_; ram_used_gb <- NA_real_; ram_total_gb <- NA_real_
+
+  if (identical(sysname, "Linux")) {
+    meminfo <- tryCatch(readLines("/proc/meminfo"), error = function(e) character(0))
+    get_kb <- function(key) {
+      ln <- grep(paste0("^", key, ":"), meminfo, value = TRUE)
+      if (length(ln) == 0) return(NA_real_)
+      as.numeric(regmatches(ln, regexpr("[0-9]+", ln)))
+    }
+    total_kb <- get_kb("MemTotal"); avail_kb <- get_kb("MemAvailable")
+    if (!is.na(total_kb) && !is.na(avail_kb)) {
+      ram_total_gb <- total_kb / 1024^2
+      ram_used_gb  <- (total_kb - avail_kb) / 1024^2
+    }
+    load1 <- tryCatch(as.numeric(strsplit(readLines("/proc/loadavg")[1], " ")[[1]][1]),
+                      error = function(e) NA_real_)
+    if (!is.na(load1) && !is.na(cores) && cores > 0) cpu_pct <- min(100, 100 * load1 / cores)
+  } else if (identical(sysname, "Darwin")) {
+    cpu_pct <- tryCatch({
+      top_out  <- system("top -l 1 -n 0", intern = TRUE)
+      idle_ln  <- grep("CPU usage", top_out, value = TRUE)
+      idle_pct <- as.numeric(sub(".*?([0-9.]+)% idle.*", "\\1", idle_ln))
+      if (length(idle_pct) == 1 && !is.na(idle_pct)) 100 - idle_pct else NA_real_
+    }, error = function(e) NA_real_)
+    ram_total_gb <- tryCatch(
+      suppressWarnings(as.numeric(system("sysctl -n hw.memsize", intern = TRUE))) / 1024^3,
+      error = function(e) NA_real_)
+  } else if (identical(sysname, "Windows")) {
+    cpu_pct <- tryCatch({
+      v <- system("wmic cpu get loadpercentage /value", intern = TRUE)
+      v <- grep("LoadPercentage=", v, value = TRUE)
+      suppressWarnings(as.numeric(sub("LoadPercentage=", "", v)))
+    }, error = function(e) NA_real_)
+    mem_out <- tryCatch(
+      system("wmic OS get FreePhysicalMemory,TotalVisibleMemorySize /value", intern = TRUE),
+      error = function(e) character(0))
+    free_kb  <- suppressWarnings(as.numeric(sub("FreePhysicalMemory=", "",
+                  grep("FreePhysicalMemory=", mem_out, value = TRUE))))
+    total_kb <- suppressWarnings(as.numeric(sub("TotalVisibleMemorySize=", "",
+                  grep("TotalVisibleMemorySize=", mem_out, value = TRUE))))
+    if (length(free_kb) == 1 && length(total_kb) == 1 && !is.na(free_kb) && !is.na(total_kb)) {
+      ram_total_gb <- total_kb / 1024^2
+      ram_used_gb  <- (total_kb - free_kb) / 1024^2
+    }
+  }
+
+  list(sysname = sysname, cores = cores, cpu_pct = cpu_pct,
+       ram_used_gb = ram_used_gb, ram_total_gb = ram_total_gb)
 }
 
 clean_json_fence <- function(x) {
@@ -2957,6 +3043,16 @@ ui <- fluidPage(
           actionButton("btn_reset_usage", "Reset counters",
                        class = "btn btn-sm btn-outline-secondary",
                        style = "font-family:'IBM Plex Mono';font-size:0.7rem;")
+      ),
+
+      div(class = "section-card",
+          div(class = "section-title", "Hardware & Live Requests"),
+          div(style = "font-size:0.75rem;color:#8b949e;margin-bottom:10px;",
+              "GPU, CPU and RAM read straight off this machine every few seconds \u2014 only meaningful when the backend is LM Studio (local). Vertex calls run in Google's datacenter and show up only in the request table below, with no GPU line, since there is no local GPU work to measure for them."),
+          uiOutput("hw_tiles_ui"),
+          hr(class = "divider-line"),
+          div(class = "form-label", "Recent requests \u2014 this session, most recent first"),
+          DT::dataTableOutput("hw_requests_dt")
       )
     ),
     nav_panel(
@@ -3184,12 +3280,37 @@ server <- function(input, output, session) {
     # accumulated across every API call (including retries) in that run.
     total_input_tokens = 0, total_output_tokens = 0, total_api_calls = 0,
     total_thought_tokens = 0,
-    run_elapsed_secs = 0, run_finished = FALSE, run_model = NULL
+    run_elapsed_secs = 0, run_finished = FALSE, run_model = NULL,
+    # Per-call history for the Usage & Cost "Hardware & Live Requests" panel.
+    # Capped at 200 rows (most recent kept) so a long run doesn't grow this
+    # without bound in memory.
+    request_log = data.frame(
+      time = character(0), source = character(0), status = character(0),
+      prompt_tokens = numeric(0), output_tokens = numeric(0),
+      duration_secs = numeric(0), tok_per_sec = numeric(0),
+      stringsAsFactors = FALSE
+    )
   )
 
   log_add <- function(...) {
     msg <- paste0("[", format(Sys.time(), "%H:%M:%S"), "]  ", paste(...))
     rv$log_lines <- c(rv$log_lines, msg)
+  }
+
+  # source: "Pipeline" or "Chat", for the Recent Requests table.
+  record_request <- function(source, status, prompt_tokens, output_tokens, duration_secs) {
+    out_tok <- num0(output_tokens)
+    tok_s <- if (duration_secs > 0) round(out_tok / duration_secs, 1) else NA_real_
+    row <- data.frame(
+      time = format(Sys.time(), "%H:%M:%S"),
+      source = source, status = status,
+      prompt_tokens = num0(prompt_tokens), output_tokens = out_tok,
+      duration_secs = round(duration_secs, 1), tok_per_sec = tok_s,
+      stringsAsFactors = FALSE
+    )
+    updated <- rbind(rv$request_log, row)
+    if (nrow(updated) > 200) updated <- updated[(nrow(updated) - 199):nrow(updated), ]
+    rv$request_log <- updated
   }
 
   # NA-safe numeric coalesce — a token count missing from an API response
@@ -3265,6 +3386,7 @@ server <- function(input, output, session) {
       return()
     }
 
+    chat_t0 <- Sys.time()
     result <- withProgress(message = "Waiting for model\u2026", value = 0.5, {
       if (provider == "vertex") {
         call_gemini_chat(chat_rv$turns, rv$gcp_token, build_vertex_cfg())
@@ -3272,15 +3394,23 @@ server <- function(input, output, session) {
         call_lmstudio_chat(chat_rv$turns, input$lm_base_url, input$lm_model_input)
       }
     })
+    chat_dur <- as.numeric(difftime(Sys.time(), chat_t0, units = "secs"))
 
+    # Neither chat helper returns a token count (they're free-form, not run
+    # through the schema path that parses usageMetadata) — approximate output
+    # tokens from characters so the tok/s column in Usage & Cost still has
+    # something comparable, rather than leaving every chat row blank.
+    approx_tokens <- function(txt) if (is.na(txt)) 0 else round(nchar(txt) / 4)
 
     if (!is.na(result$text)) {
       chat_rv$turns <- c(chat_rv$turns, list(list(role = "assistant", text = result$text)))
+      record_request("Chat", "Done", approx_tokens(msg), approx_tokens(result$text), chat_dur)
     } else {
       chat_rv$turns <- c(chat_rv$turns, list(list(
         role = "error",
         text = paste0("Request failed: ", result$reason)
       )))
+      record_request("Chat", "Error", approx_tokens(msg), 0, chat_dur)
     }
   })
 
@@ -3876,7 +4006,9 @@ server <- function(input, output, session) {
           attempts <- attempts + 1
           if (attempts > 1) log_add(sprintf("  -> Retry attempt %d...", attempts))
 
+          call_t0 <- Sys.time()
           api_result <- call_llm(full_prompt, provider, rv$gcp_token, vertex_cfg, lm_cfg, active_schema)
+          call_dur <- as.numeric(difftime(Sys.time(), call_t0, units = "secs"))
           json_response <- api_result$text; finish_reason <- api_result$reason; err_detail <- api_result$detail
           if (!is.null(api_result$usage)) {
             rv$total_input_tokens  <- rv$total_input_tokens  + num0(api_result$usage$input_tokens)
@@ -3884,6 +4016,8 @@ server <- function(input, output, session) {
             rv$total_api_calls     <- rv$total_api_calls + 1
             rv$total_thought_tokens <- rv$total_thought_tokens + num0(api_result$usage$thought_tokens)
           }
+          record_request("Pipeline", if (!is.na(json_response)) "Done" else "Error",
+                         api_result$usage$input_tokens %||% 0, api_result$usage$output_tokens %||% 0, call_dur)
           last_reason <- as.character(finish_reason)
           if (!is.null(err_detail) && length(err_detail) > 0)
             last_detail <- substr(gsub("\\s+", " ", as.character(err_detail)), 1, 300)
@@ -4113,6 +4247,71 @@ server <- function(input, output, session) {
         div(style = paste0("font-family:'IBM Plex Mono';font-size:1.3rem;font-weight:700;margin-top:4px;color:", accent, ";"), value),
         if (!is.null(sub)) div(style = "font-size:0.7rem;color:#8b949e;margin-top:2px;", sub))
   }
+
+  # ── Hardware & Live Requests (Usage & Cost tab) ──
+  output$hw_tiles_ui <- renderUI({
+    invalidateLater(3000, session)
+    gpu <- tryCatch(get_gpu_stats(), error = function(e) NULL)
+    sys <- tryCatch(get_sys_stats(), error = function(e) NULL)
+
+    last_tok_s <- {
+      rl <- rv$request_log
+      ok <- rl[rl$status == "Done" & !is.na(rl$tok_per_sec), , drop = FALSE]
+      if (nrow(ok) > 0) ok$tok_per_sec[nrow(ok)] else NA_real_
+    }
+
+    tiles <- list(
+      ab_tile("Speed", if (is.na(last_tok_s)) "\u2014" else sprintf("%.1f tok/s", last_tok_s), "last request")
+    )
+
+    if (!is.null(gpu)) {
+      vram_pct <- if (!is.na(gpu$vram_total_mb) && gpu$vram_total_mb > 0)
+        round(100 * gpu$vram_used_mb / gpu$vram_total_mb) else NA
+      tiles <- c(tiles, list(
+        ab_tile("GPU load", sprintf("%s%%", gpu$gpu_util_pct %||% "\u2014"), gpu$name),
+        ab_tile("VRAM", sprintf("%.1f / %.1f GB", gpu$vram_used_mb / 1024, gpu$vram_total_mb / 1024),
+               if (!is.na(vram_pct)) sprintf("%d%% used", vram_pct) else NULL,
+               accent = if (!is.na(vram_pct) && vram_pct > 90) "#f85149" else "#e6edf3"),
+        ab_tile("GPU temp", sprintf("%s\u00b0C", gpu$temp_c %||% "\u2014"), NULL,
+               accent = if (!is.na(gpu$temp_c) && gpu$temp_c > 80) "#f85149" else "#e6edf3"),
+        ab_tile("Power", sprintf("%s W", round(gpu$power_w %||% NA)),
+               sprintf("of %s W limit", round(gpu$power_limit_w %||% NA)))
+      ))
+    } else {
+      tiles <- c(tiles, list(
+        ab_tile("GPU", "Not detected", "no nvidia-smi on this machine \u2014 normal if you're on Vertex AI only")
+      ))
+    }
+
+    if (!is.null(sys)) {
+      tiles <- c(tiles, list(
+        ab_tile("CPU", if (is.na(sys$cpu_pct)) "\u2014" else sprintf("%.0f%%", sys$cpu_pct),
+               sprintf("%s cores", sys$cores %||% "?")),
+        ab_tile("System RAM",
+               if (is.na(sys$ram_used_gb) || is.na(sys$ram_total_gb)) "\u2014"
+               else sprintf("%.1f / %.1f GB", sys$ram_used_gb, sys$ram_total_gb))
+      ))
+    }
+
+    div(style = "display:flex;flex-wrap:wrap;gap:10px;", tagList(tiles))
+  })
+
+  output$hw_requests_dt <- DT::renderDataTable({
+    rl <- rv$request_log
+    if (nrow(rl) == 0) {
+      return(DT::datatable(
+        data.frame(Message = "No requests yet this session."),
+        options = list(dom = "t"), rownames = FALSE
+      ))
+    }
+    disp <- rl[rev(seq_len(nrow(rl))), , drop = FALSE]
+    names(disp) <- c("Time", "Source", "Status", "Prompt tok", "Output tok", "Duration (s)", "Tok/s")
+    DT::datatable(
+      disp, rownames = FALSE, selection = "none",
+      options = list(pageLength = 8, lengthChange = FALSE, searching = FALSE,
+                     order = list(), dom = "tip")
+    )
+  })
 
   ab_data_a <- reactive({
     fi <- input$ab_file_a; req(fi)
