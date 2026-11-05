@@ -43,7 +43,7 @@ DEFAULT_DB_CONFIG <- list(
 
 DEFAULT_VERTEX_CONFIG <- list(
   project  = "your-gcp-project-id",
-  location = "us-central1",
+  location = "global",
   model    = "gemini-2.5-flash"
 )
 
@@ -905,10 +905,22 @@ check_gcp_auth <- function() {
 }
 
 call_gemini <- function(prompt, token, ai_cfg, schema) {
-  endpoint <- sprintf(
-    "https://%s-aiplatform.googleapis.com/v1/projects/%s/locations/%s/publishers/google/models/%s:generateContent",
-    ai_cfg$location, ai_cfg$project, ai_cfg$location, ai_cfg$model
-  )
+  # The "global" endpoint is NOT region-prefixed (aiplatform.googleapis.com);
+  # every other location IS region-prefixed ({location}-aiplatform.googleapis.com).
+  # Using the regional hostname with location = "global" in the path (or vice
+  # versa) returns a 404 NOT_FOUND on publishers/google/models/..., which looks
+  # exactly like "wrong model name" but is actually "wrong endpoint shape".
+  endpoint <- if (identical(ai_cfg$location, "global")) {
+    sprintf(
+      "https://aiplatform.googleapis.com/v1/projects/%s/locations/global/publishers/google/models/%s:generateContent",
+      ai_cfg$project, ai_cfg$model
+    )
+  } else {
+    sprintf(
+      "https://%s-aiplatform.googleapis.com/v1/projects/%s/locations/%s/publishers/google/models/%s:generateContent",
+      ai_cfg$location, ai_cfg$project, ai_cfg$location, ai_cfg$model
+    )
+  }
 
   make_body <- function(use_schema) {
     b <- list(
@@ -2752,7 +2764,10 @@ ui <- fluidPage(
                      condition = "input.llm_provider == 'vertex'",
                      div(textInput("ai_project", "GCP Project", value = DEFAULT_VERTEX_CONFIG$project),
                          fluidRow(
-                           column(6, textInput("ai_location", "Location", value = DEFAULT_VERTEX_CONFIG$location)),
+                           column(6, textInput("ai_location", "Location", value = DEFAULT_VERTEX_CONFIG$location),
+                                  helpText("\"global\" works for every current Gemini model. ",
+                                           "\"us-central1\" and other regions only serve a subset ",
+                                           "and will 404 for models not deployed there.")),
                            column(6, selectizeInput("ai_model_vertex", "Model",
                                                  choices = gemini_model_choices(),
                                                  selected = DEFAULT_VERTEX_CONFIG$model,
