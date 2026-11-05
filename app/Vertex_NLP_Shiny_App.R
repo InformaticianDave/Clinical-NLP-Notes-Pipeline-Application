@@ -2420,6 +2420,9 @@ AB_NON_COMPARE <- c("NOTE_TEXT", "NOTE_DATE", "CONTACT_DATE", "extract_error",
 #   -- terminal failure statuses written by the pipeline (never NA) --
 #   failed_api         -> both API attempts returned no text
 #   failed_parse       -> API returned text but JSON never parsed
+#   failed_status      -> JSON parsed, but status computation itself errored;
+#                         extract_error carries the reason. Rare, and the run
+#                         continues rather than aborting.
 #   skipped_empty_note -> NOTE_TEXT was blank / < 5 chars
 # =============================================================================
 .review_status_core <- function(present_val, negated_val, conf_val, present_true, conf_threshold = 0.7) {
@@ -2432,9 +2435,25 @@ AB_NON_COMPARE <- c("NOTE_TEXT", "NOTE_DATE", "CONTACT_DATE", "extract_error",
       is.na(present_val[1]) || norm(present_val[1]) %in% c("", "na", "null"))
     return("no_call")
   if (is_flag_true(negated_val)) return("exclude_negated")
-  if (!(norm(present_val[1]) %in% norm(present_true))) return("exclude_absent")
-  conf <- suppressWarnings(as.numeric(conf_val[1]))
-  if (is.na(conf)) return("review_no_conf")
+
+  # If a preset somehow carries no present_true, fall back to the usual truthy
+  # set rather than letting the %in% below silently mark EVERY row
+  # exclude_absent, which would look like a clean run full of real negatives.
+  pt <- if (is.null(present_true) || length(present_true) == 0)
+          c("true", "yes", "1") else present_true
+  if (!(norm(present_val[1]) %in% norm(pt))) return("exclude_absent")
+
+  # Confidence may be absent entirely (the model omitted the key -> NULL), an
+  # empty vector, a list, or a non-numeric string. All of those mean "no usable
+  # confidence", not a crash. The old code did as.numeric(conf_val[1]): on NULL
+  # that is numeric(0), so is.na() returned logical(0) and the if() below threw
+  # "argument is of length zero", killing the whole run over one missing field.
+  conf <- tryCatch({
+    if (is.null(conf_val) || length(conf_val) == 0) NA_real_
+    else suppressWarnings(as.numeric(conf_val[[1]]))
+  }, error = function(e) NA_real_)
+  if (length(conf) != 1 || is.na(conf)) return("review_no_conf")
+
   if (conf >= conf_threshold) return("include")
   "review_low_conf"
 }
@@ -4039,20 +4058,35 @@ server <- function(input, output, session) {
                   notes_data[[col]][i] <- as.character(val)
                 }
               }
-              if (!is.null(preset$review_specs)) {
-                st <- character(0)
-                for (rspec in preset$review_specs) {
-                  s <- .review_status_core(parsed[[rspec$present_field]], parsed[[rspec$negated_field]],
-                                           parsed[[rspec$conf_field]], rspec$present_true, conf_threshold)
-                  notes_data[[rspec$out]][i] <- s
-                  st <- c(st, s)
+              # Status computation is wrapped so that an unexpected shape in one
+              # row's JSON marks that row and lets the run continue. Before this,
+              # any error here escaped the row loop and aborted the whole run.
+              status_ok <- tryCatch({
+                if (!is.null(preset$review_specs)) {
+                  st <- character(0)
+                  for (rspec in preset$review_specs) {
+                    s <- .review_status_core(parsed[[rspec$present_field]], parsed[[rspec$negated_field]],
+                                             parsed[[rspec$conf_field]], rspec$present_true, conf_threshold)
+                    notes_data[[rspec$out]][i] <- s
+                    st <- c(st, s)
+                  }
+                  notes_data[["review_status"]][i] <- .rollup_review_status(st)
+                } else {
+                  notes_data[["review_status"]][i] <- compute_review_status(parsed, preset, conf_threshold)
                 }
-                notes_data[["review_status"]][i] <- .rollup_review_status(st)
-              } else {
-                notes_data[["review_status"]][i] <- compute_review_status(parsed, preset, conf_threshold)
-              }
-              # Clear any stale error from a previous failed run of this row.
-              notes_data[["extract_error"]][i] <- NA_character_
+                TRUE
+              }, error = function(e) {
+                notes_data[["review_status"]][i]  <<- "failed_status"
+                notes_data[["extract_error"]][i]  <<- paste0("REVIEW_STATUS_ERROR: ",
+                                                             substr(conditionMessage(e), 1, 200))
+                log_add(sprintf("  -> Row %d: review status could not be computed (%s). Row flagged, run continues.",
+                                i, substr(conditionMessage(e), 1, 120)))
+                FALSE
+              })
+              # Clear any stale error from a previous failed run of this row —
+              # but NOT if the status step just recorded one, or we would wipe
+              # the only record of why this row is flagged.
+              if (isTRUE(status_ok)) notes_data[["extract_error"]][i] <- NA_character_
               if (grepl("SCHEMA_FALLBACK", last_reason, fixed = TRUE))
                 log_add("  -> Recovered via schema-free fallback.")
               success <- TRUE
